@@ -14,7 +14,7 @@ import pygame as pg
 
 from .assets import shade_brightness, shade_level
 from .raycasting import RayCaster
-from .settings import FOV, HEIGHT, SHADE_LEVELS, TEXTURE_SIZE, WIDTH
+from .settings import FOV, SHADE_LEVELS, TEXTURE_SIZE
 from .view import View
 
 

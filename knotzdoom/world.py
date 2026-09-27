@@ -2,7 +2,7 @@
 import math
 import random
 
-from .level import ENEMY_KINDS
+from .assets import TEX_EXIT, TEX_EXIT_ON
 from .objects import ObjectHandler
 from .pathfinding import PathFinding
 from .player import Player
@@ -223,7 +223,6 @@ class World:
             return
         self.exit_triggered = True
         self.exit_timer = 0.0
-        from .assets import TEX_EXIT, TEX_EXIT_ON
         for pos in self.level.exits:
             if self.walls.get(pos) == TEX_EXIT:
                 self.walls[pos] = TEX_EXIT_ON
@@ -294,7 +293,6 @@ class World:
 
     # ------------------------------------------------------------ persistence
     def save_state(self):
-        from .assets import TEX_EXIT_ON
         return {
             'level': self.level.id,
             'difficulty': self.difficulty_index,

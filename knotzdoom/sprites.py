@@ -7,8 +7,6 @@ request; the renderer sorts and clips against the wall depth buffer.
 """
 import math
 
-import pygame as pg
-
 
 
 class Animation:
@@ -21,23 +19,19 @@ class Animation:
         self.index = 0
         self.timer = 0.0
         self.done = False
-        self.advanced = False        # True on the frame the index changed
 
     def reset(self):
         self.index = 0
         self.timer = 0.0
         self.done = False
-        self.advanced = False
 
     def update(self, dt):
-        self.advanced = False
         if self.done:
             return
         self.timer += dt
         while self.timer >= self.frame_time:
             self.timer -= self.frame_time
             self.index += 1
-            self.advanced = True
             if self.index >= len(self.frames):
                 if self.loop:
                     self.index = 0

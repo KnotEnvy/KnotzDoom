@@ -1,5 +1,4 @@
 """Weapon definitions and the first-person weapon view."""
-import math
 import random
 
 import pygame as pg
@@ -51,7 +50,6 @@ class Weapon:
         self.cooldown = 0.0
         self.trigger = False
         self.kick = 0.0
-        self.flash_time = 0.0
 
     def load_frames(self, name, d):
         raw = self.world.game.assets.frames('weapon/' + name)

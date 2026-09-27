@@ -1,6 +1,5 @@
 """User options persisted to ``config.json`` in the repository root."""
 import json
-import os
 
 from .settings import CONFIG_PATH
 

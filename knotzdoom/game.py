@@ -31,7 +31,6 @@ class Game:
         self.screen = self.make_screen()
         pg.display.set_caption(TITLE)
         self.clock = pg.time.Clock()
-        self.delta_time = 16
         self.assets = Assets()
         self.fonts = Fonts()
         self.audio = Audio(self.config)
@@ -315,7 +314,6 @@ class Game:
             dt = self.clock.tick(cap) if cap else self.clock.tick()
             self.detail.record_frame(self.clock.get_rawtime())
         dt = min(dt, 60)                # never let a hitch teleport things through walls
-        self.delta_time = dt
         self.check_events()
         if not self.running:
             return

@@ -27,7 +27,7 @@ TITLE = 'KnotzDoom'
 # ---------------------------------------------------------------- player
 PLAYER_SPEED = 0.004          # world units per millisecond
 PLAYER_SPRINT_MULT = 1.45
-PLAYER_ROT_SPEED = 0.002
+PLAYER_ROT_SPEED = 0.0025       # radians per millisecond (arrow keys)
 PLAYER_RADIUS = 0.25          # collision radius in world units
 PLAYER_MAX_HEALTH = 100
 PLAYER_SUPER_HEALTH = 200
@@ -39,19 +39,12 @@ MOUSE_BORDER_LEFT = 100
 MOUSE_BORDER_RIGHT = WIDTH - MOUSE_BORDER_LEFT
 
 # ---------------------------------------------------------------- raycasting
+# (ray counts, column width and projection distance depend on the detail level
+#  and live in view.View)
 FOV = math.pi / 3
 HALF_FOV = FOV / 2
-NUM_RAYS = WIDTH // 2
-HALF_NUM_RAYS = NUM_RAYS // 2
-DELTA_ANGLE = FOV / NUM_RAYS
-MAX_DEPTH = 24
-
-SCREEN_DIST = HALF_WIDTH / math.tan(HALF_FOV)
-SCALE = WIDTH // NUM_RAYS
-MAX_PROJ_HEIGHT = HEIGHT * 12  # clamp so very close walls don't explode
-
+MAX_DEPTH = 24                # tiles a ray travels before giving up
 TEXTURE_SIZE = 256
-HALF_TEXTURE_SIZE = TEXTURE_SIZE // 2
 
 # ---------------------------------------------------------------- lighting
 SHADE_LEVELS = 10             # number of pre-darkened texture copies
@@ -59,8 +52,7 @@ SHADE_MAX_DEPTH = 14.0        # depth at which walls reach the darkest level
 SHADE_MIN_BRIGHT = 0.12       # brightness of the darkest level (0..1)
 
 # ---------------------------------------------------------------- hud
-STATUS_BAR_HEIGHT = 96
-VIEW_HEIGHT = HEIGHT           # the 3d view is drawn full screen; the bar overlays it
+STATUS_BAR_HEIGHT = 96         # the 3d view is drawn full screen; the bar overlays it
 
 # ---------------------------------------------------------------- gameplay
 DOOR_OPEN_TIME = 450           # ms for a door to slide fully open

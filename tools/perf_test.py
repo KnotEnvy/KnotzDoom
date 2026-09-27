@@ -7,7 +7,6 @@ os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pygame as pg  # noqa: E402
 from knotzdoom.game import Game  # noqa: E402
 from knotzdoom.states import PlayState  # noqa: E402
 

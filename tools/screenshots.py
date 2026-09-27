@@ -2,7 +2,6 @@
 
     python tools/screenshots.py [out_dir]
 """
-import math
 import os
 import sys
 

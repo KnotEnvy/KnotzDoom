@@ -104,7 +104,7 @@ class HUD:
         return start
 
     def draw_percent(self, screen, value, x, y):
-        start = self.draw_number(screen, value, x, y)
+        self.draw_number(screen, value, x, y)
         screen.blit(self.digits['10'], (x, y))
 
     def draw_status_bar(self, screen, world):

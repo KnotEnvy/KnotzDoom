@@ -1,13 +1,12 @@
 """The player: movement, mouse look, inventory, damage and the "use" action."""
 import math
-import random
 
 import pygame as pg
 
-from .settings import (DOOR_PASSABLE, HEIGHT, MOUSE_BORDER_LEFT, MOUSE_BORDER_RIGHT, MOUSE_MAX_REL,
+from .settings import (HEIGHT, MOUSE_BORDER_LEFT, MOUSE_BORDER_RIGHT, MOUSE_MAX_REL,
                        MOUSE_SENSITIVITY, HALF_WIDTH, HALF_HEIGHT, PLAYER_MAX_ARMOR,
-                       PLAYER_MAX_HEALTH, PLAYER_RADIUS, PLAYER_SPEED, PLAYER_SPRINT_MULT,
-                       PLAYER_SUPER_HEALTH, USE_DISTANCE)
+                       PLAYER_MAX_HEALTH, PLAYER_RADIUS, PLAYER_ROT_SPEED, PLAYER_SPEED,
+                       PLAYER_SPRINT_MULT, USE_DISTANCE)
 from .weapons import WEAPON_DEFS, WEAPON_SLOTS, Weapon
 
 AMMO_MAX = {'bullets': 200, 'shells': 50, 'rockets': 50}
@@ -21,7 +20,6 @@ class Player:
         self.x, self.y = pos
         self.angle = angle % math.tau
         self.cam_h = 0.5
-        self.rel = 0
         self.health = PLAYER_MAX_HEALTH
         self.armor = 0
         self.armor_type = 0                 # 0 none, 1 green (1/3 absorb), 2 blue (1/2 absorb)
@@ -228,9 +226,9 @@ class Player:
             dy += speed * cos_a
             pressed += 1
         if keys[pg.K_LEFT]:
-            self.angle -= 0.0025 * dt
+            self.angle -= PLAYER_ROT_SPEED * dt
         if keys[pg.K_RIGHT]:
-            self.angle += 0.0025 * dt
+            self.angle += PLAYER_ROT_SPEED * dt
         if pressed > 1:
             dx *= 0.7071
             dy *= 0.7071
@@ -268,7 +266,6 @@ class Player:
             rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, rel))
         else:
             rel = 0
-        self.rel = rel
         self.angle += rel * MOUSE_SENSITIVITY * self.config['mouse_sensitivity'] * dt
         self.angle %= math.tau
 

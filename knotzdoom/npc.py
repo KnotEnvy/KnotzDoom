@@ -73,7 +73,6 @@ class NPC(AnimatedSprite):
         self.los_timer = random.uniform(0, 100)
         self.attack_fired = False
         self.score = d['score']
-        self.boss = d.get('boss', False)
 
     # ------------------------------------------------------------ helpers
     @property

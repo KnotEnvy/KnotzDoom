@@ -6,7 +6,9 @@ import numpy as np
 import pygame as pg
 
 from knotzdoom.raycasting import RayCaster, cast_single_ray, line_of_sight
-from knotzdoom.settings import HALF_NUM_RAYS, RES
+from knotzdoom.settings import RES, WIDTH
+
+HALF_NUM_RAYS = WIDTH // 4
 from knotzdoom.view import View
 
 

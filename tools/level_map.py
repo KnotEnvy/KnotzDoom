@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pygame as pg  # noqa: E402
 
-from knotzdoom.level import DOOR_CHARS, ENEMY_KINDS, load_episode, load_level  # noqa: E402
+from knotzdoom.level import DOOR_CHARS, THING_LEGEND, load_episode, load_level  # noqa: E402
 
 TILE = 22
 WALL_COLORS = {1: (120, 120, 125), 2: (150, 60, 50), 3: (80, 110, 80), 4: (110, 100, 70), 5: (150, 120, 90),
@@ -39,10 +39,7 @@ def render(level, font):
             else:
                 pg.draw.rect(surf, (40, 40, 46), rect)
             if ch not in '#.~123456789DRBYSX ':
-                color = THING_COLORS.get(level.char_kind(ch) if hasattr(level, 'char_kind') else None, None)
-                from knotzdoom.level import THING_LEGEND
-                kind = THING_LEGEND.get(ch)
-                color = THING_COLORS.get(kind, (200, 220, 255))
+                color = THING_COLORS.get(THING_LEGEND.get(ch), (200, 220, 255))
                 if ch == 'P':
                     color = (255, 255, 255)
                 label = font.render(ch, True, color)

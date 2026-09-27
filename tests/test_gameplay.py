@@ -1,8 +1,6 @@
 """Player, weapons, enemies, pickups, doors and save / load round trips."""
 import math
 
-import pygame as pg
-
 from knotzdoom.world import World
 
 

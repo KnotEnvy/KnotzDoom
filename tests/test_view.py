@@ -1,8 +1,6 @@
 """View geometry and the automatic detail controller."""
 import math
 
-import pygame as pg
-
 from knotzdoom.settings import FOV, HALF_FOV, HEIGHT, WIDTH
 from knotzdoom.view import DetailController, View
 

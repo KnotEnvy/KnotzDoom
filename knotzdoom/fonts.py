@@ -128,5 +128,4 @@ class Fonts:
         self.menu = BigFont(54)
         self.small_big = BigFont(38)
         self.pixel = PixelFont(18, 2)
-        self.pixel_small = PixelFont(16, 1)
         self.pixel_large = PixelFont(24, 2)

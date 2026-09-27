@@ -12,8 +12,7 @@ import random
 import pygame as pg
 
 from . import saves
-from .level import load_level
-from .settings import (DIFFICULTIES, HALF_HEIGHT, HALF_WIDTH, HEIGHT, STATUS_BAR_HEIGHT, WIDTH)
+from .settings import DIFFICULTIES, HALF_HEIGHT, HALF_WIDTH, HEIGHT, WIDTH
 from .world import World
 
 CHEATS = ('iddqd', 'idkfa', 'idclip', 'iddt')
@@ -490,7 +489,6 @@ class StoryState(State):
 
     def __init__(self, game, text, on_done, music='intermission', background='7'):
         super().__init__(game)
-        self.text = text
         self.on_done = on_done
         self.music = music
         self.shown = 0.0
@@ -771,7 +769,6 @@ class SaveLoadState(State):
                 label = f'SLOT {slot + 1}: EMPTY'
                 enabled = self.mode == 'save'
             else:
-                minutes = int(summary['time'] // 60000)
                 label = f'SLOT {slot + 1}: {summary["level_name"].upper()}'
                 enabled = True
             items.append(MenuItem(label, (lambda s=slot: self.choose(s)), enabled=enabled,

@@ -1,10 +1,9 @@
 """Every level in the episode must load, validate and follow the design rules."""
-import json
 import os
 
 import pytest
 
-from knotzdoom.level import ENEMY_KINDS, LevelData, load_episode, load_level, validate_level
+from knotzdoom.level import LevelData, load_episode, load_level, validate_level
 from knotzdoom.settings import LEVEL_DIR
 
 EPISODE = load_episode()

@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pygame as pg  # noqa: E402
 
 from knotzdoom.game import Game  # noqa: E402
-from knotzdoom import states  # noqa: E402
 
 
 class FakeKeys:
