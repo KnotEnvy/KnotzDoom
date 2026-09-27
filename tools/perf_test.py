@@ -8,7 +8,7 @@ os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from knotzdoom.game import Game  # noqa: E402
-from knotzdoom.states import PlayState  # noqa: E402
+from knotzdoom.ui import PlayState  # noqa: E402
 
 
 def main(level_index=0, frames=240, detail='high'):

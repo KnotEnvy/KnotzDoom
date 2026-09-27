@@ -159,7 +159,7 @@ class Walkthrough:
         self.press(pg.K_ESCAPE); self.expect('PlayState')
         # kill the player to see the death screen
         play = g.state
-        play.world.player.get_damage(500)
+        play.world.player.take_damage(500)
         self.run_frames(120)
         self.expect('DeathState'); self.shot('20_death')
         self.press(pg.K_RETURN); self.run_frames(5); self.expect('PlayState')

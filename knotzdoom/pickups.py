@@ -2,6 +2,7 @@
 import math
 import random
 
+from .settings import BARREL_SPLASH_DAMAGE, BARREL_SPLASH_RADIUS, PLAYER_SUPER_HEALTH
 from .sprites import AnimatedSprite
 from .weapons import WEAPON_DEFS
 
@@ -33,7 +34,7 @@ PICKUP_DEFS = {
 AMMO_PICKUPS = {'clip': ('bullets', 10), 'bullet_box': ('bullets', 50), 'shells': ('shells', 4),
                 'shell_box': ('shells', 20), 'rockets': ('rockets', 1), 'rocket_box': ('rockets', 5)}
 WEAPON_PICKUPS = {'shotgun', 'chaingun', 'rocket_launcher'}
-KEY_PICKUPS = {'key_red': 'red', 'key_blue': 'blue', 'key_yellow': 'yellow'}
+from .level import KEY_KINDS as KEY_PICKUPS  # noqa: E402
 
 
 def _give_weapon(player, kind):
@@ -47,7 +48,7 @@ def _give_weapon(player, kind):
 PICKUP_EFFECTS = {
     'stimpack': lambda p, k: p.give_health(10),
     'medikit': lambda p, k: p.give_health(25),
-    'soulsphere': lambda p, k: p.give_health(100, limit=200),
+    'soulsphere': lambda p, k: p.give_health(100, limit=PLAYER_SUPER_HEALTH),
     'armor_green': lambda p, k: p.give_armor(100, 1),
     'armor_blue': lambda p, k: p.give_armor(200, 2),
     'backpack': lambda p, k: p.give_backpack(),
@@ -132,7 +133,7 @@ class Barrel(Prop):
         self.fused = False
         self.fuse = 0.0
 
-    def take_damage(self, amount, source=None):
+    def take_damage(self, amount):
         if self.fused or not self.alive:
             return
         self.hp -= int(amount)
@@ -156,8 +157,8 @@ class Barrel(Prop):
         world.pathfinding.refresh_tile(self.map_pos)
         world.objects.spawn_explosion(self.pos, 0.25, 0.95)
         world.audio.play('barrel_explode', pos=self.pos)
-        world.splash_damage(self.x, self.y, 1.9, 90, source=self)
-        world.fx.light = max(world.fx.light, 120)
+        world.splash_damage(self.x, self.y, BARREL_SPLASH_RADIUS, BARREL_SPLASH_DAMAGE)
+        world.fx.flash_ms = max(world.fx.flash_ms, 120)
         dist = math.hypot(world.player.x - self.x, world.player.y - self.y)
         if dist < 6:
             world.fx.shake = max(world.fx.shake, int(12 * (1 - dist / 6)))

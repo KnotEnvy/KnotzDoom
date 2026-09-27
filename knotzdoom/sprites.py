@@ -20,11 +20,6 @@ class Animation:
         self.timer = 0.0
         self.done = False
 
-    def reset(self):
-        self.index = 0
-        self.timer = 0.0
-        self.done = False
-
     def update(self, dt):
         if self.done:
             return

@@ -10,7 +10,7 @@ import math
 import random
 
 from .raycasting import line_of_sight
-from .settings import DOOR_PASSABLE
+from .settings import DOOR_PASSABLE, LOS_INTERVAL
 from .sprites import Animation, AnimatedSprite
 
 NPC_DEFS = {
@@ -117,7 +117,7 @@ class NPC(AnimatedSprite):
         player = self.world.player
         self.dist = math.hypot(player.x - self.x, player.y - self.y)
         self.los_timer += dt
-        if self.los_timer >= 100:
+        if self.los_timer >= LOS_INTERVAL:
             self.los_timer = 0
             self.check_sight()
 
@@ -151,11 +151,7 @@ class NPC(AnimatedSprite):
         self.chase(dt)
 
     def can_attack(self):
-        if self.cooldown > 0 or not self.sees_player:
-            return False
-        if self.defn['attack'] == 'melee':
-            return self.dist <= self.defn['range']
-        return self.dist <= self.defn['range']
+        return self.cooldown <= 0 and self.sees_player and self.dist <= self.defn['range']
 
     def start_attack(self):
         self.state = 'attack'
@@ -178,7 +174,7 @@ class NPC(AnimatedSprite):
             for _ in range(d['pellets']):
                 chance = d['accuracy'] * max(0.25, 1.0 - self.dist / (d['range'] * 1.6))
                 if random.random() < chance:
-                    player.get_damage(random.randint(*d['damage']) * mult, source=self)
+                    player.take_damage(random.randint(*d['damage']) * mult)
                 else:
                     world.objects.spawn_puff_near(player, angle)
         elif kind == 'fireball':
@@ -194,7 +190,7 @@ class NPC(AnimatedSprite):
         elif kind == 'melee':
             world.audio.play('npc_attack', pos=self.pos)
             if self.dist <= d['range'] + 0.3 and line_of_sight(world, self.x, self.y, player.x, player.y):
-                player.get_damage(random.randint(*d['damage']) * mult, source=self)
+                player.take_damage(random.randint(*d['damage']) * mult)
 
     # ------------------------------------------------------------ movement
     def chase(self, dt):
@@ -207,8 +203,7 @@ class NPC(AnimatedSprite):
         if self.sees_player and self.dist < 3.0:
             target = (player.x, player.y)
         else:
-            occupied = world.objects.npc_tiles - {self.map_pos}
-            nxt = world.pathfinding.next_step(self.map_pos, occupied)
+            nxt = world.pathfinding.next_step(self.map_pos, world.objects.npc_tiles)
             if nxt is None:
                 return
             door = world.doors.get(nxt)
@@ -230,7 +225,7 @@ class NPC(AnimatedSprite):
             self.y += dy
 
     # ------------------------------------------------------------ damage
-    def take_damage(self, amount, source=None):
+    def take_damage(self, amount):
         if not self.is_alive:
             return
         self.hp -= int(amount)

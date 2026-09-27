@@ -14,7 +14,7 @@ import pygame as pg  # noqa: E402
 from knotzdoom.game import Game  # noqa: E402
 from knotzdoom.npc import NPC  # noqa: E402
 from knotzdoom.pickups import Barrel, Pickup  # noqa: E402
-from knotzdoom import states  # noqa: E402
+from knotzdoom import ui as states  # noqa: E402
 
 
 def frames(game, n, dt=16):

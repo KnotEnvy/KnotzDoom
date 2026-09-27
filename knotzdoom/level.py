@@ -49,8 +49,6 @@ THING_LEGEND = {
 }
 ENEMY_KINDS = {'trooper', 'sergeant', 'cacodemon', 'knight', 'cyberdemon'}
 KEY_KINDS = {'key_red': 'red', 'key_blue': 'blue', 'key_yellow': 'yellow'}
-SOLID_PROPS = {'barrel', 'pillar'}
-ITEM_KINDS = set(THING_LEGEND.values()) - ENEMY_KINDS - {'barrel', 'pillar', 'torch_red', 'torch_green', 'candelabra', 'skulls'}
 
 DOOR_TEXTURES = {None: TEX_DOOR, 'red': TEX_DOOR_RED, 'blue': TEX_DOOR_BLUE, 'yellow': TEX_DOOR_YELLOW}
 
@@ -173,12 +171,6 @@ class LevelData:
         """True when the tile is walkable ground (doors count as floor here)."""
         ch = self.char(x, y)
         return not self.is_solid_char(ch) or ch in DOOR_CHARS or ch == SECRET_DOOR
-
-    def door_at(self, x, y):
-        for door in self.doors:
-            if door.x == x and door.y == y:
-                return door
-        return None
 
     def secret_areas(self):
         """Group contiguous secret floor tiles into areas (each counts once)."""

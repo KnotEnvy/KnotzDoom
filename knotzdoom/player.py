@@ -5,11 +5,11 @@ import pygame as pg
 
 from .settings import (HEIGHT, MOUSE_BORDER, MOUSE_MAX_PIXELS_PER_SEC, MOUSE_RAD_PER_PIXEL, WIDTH,
                        HALF_WIDTH, HALF_HEIGHT, PLAYER_MAX_ARMOR, PLAYER_MAX_HEALTH, PLAYER_RADIUS,
-                       PLAYER_ROT_SPEED, PLAYER_SPEED, PLAYER_SPRINT_MULT, USE_DISTANCE)
+                       PLAYER_ROT_SPEED, PLAYER_SPEED, PLAYER_SPRINT_MULT, PLAYER_START_BULLETS,
+                       PLAYER_SUPER_HEALTH, USE_DISTANCE)
 from .weapons import WEAPON_DEFS, WEAPON_SLOTS, Weapon
 
 AMMO_MAX = {'bullets': 200, 'shells': 50, 'rockets': 50}
-AMMO_NAMES = {'bullets': 'BULL', 'shells': 'SHEL', 'rockets': 'RCKT'}
 DEATH_ANIM_TIME = 1100      # ms for the camera to sink to the floor
 
 
@@ -41,8 +41,8 @@ class Player:
         self.sprinting = False
         self.firing = False
         self.last_hurt = -10000
-        self.give_weapon('pistol', announce=False)
-        self.ammo['bullets'] = 50
+        self.give_weapon('pistol', with_ammo=False)
+        self.ammo['bullets'] = PLAYER_START_BULLETS
 
     # ------------------------------------------------------------ properties
     @property
@@ -62,13 +62,13 @@ class Player:
         return self.world.game.config
 
     # ------------------------------------------------------------ inventory
-    def give_weapon(self, name, announce=True):
-        """Returns True if the weapon was new."""
+    def give_weapon(self, name, with_ammo=True):
+        """Add a weapon (plus the ammo it comes with); returns True if it was new."""
         is_new = name not in self.weapons
         if is_new:
             self.weapons[name] = Weapon(self, name)
         ammo_type = WEAPON_DEFS[name]['ammo']
-        if ammo_type:
+        if ammo_type and with_ammo:
             self.give_ammo(ammo_type, WEAPON_DEFS[name]['pickup_ammo'], scale=True)
         if is_new and (self.weapon is None or WEAPON_DEFS[name]['slot'] > WEAPON_DEFS[self.weapon.name]['slot']):
             self.select_weapon(name, instant=self.weapon is None)
@@ -83,6 +83,8 @@ class Player:
         return self.ammo[ammo_type] > before
 
     def give_health(self, amount, limit=PLAYER_MAX_HEALTH):
+        """Heal up to ``limit`` (PLAYER_SUPER_HEALTH for soulspheres)."""
+        limit = min(limit, PLAYER_SUPER_HEALTH)
         if self.health >= limit:
             return False
         self.health = min(limit, self.health + amount)
@@ -147,7 +149,7 @@ class Player:
         return 'pistol'
 
     # ------------------------------------------------------------ damage
-    def get_damage(self, amount, source=None, scaled=True):
+    def take_damage(self, amount):
         if not self.alive:
             return
         amount = int(round(amount))
@@ -263,7 +265,7 @@ class Player:
                 return
             if tile in world.walls:
                 if tile in world.level.exits:
-                    world.trigger_exit(tile)
+                    world.trigger_exit()
                 return
 
     # ------------------------------------------------------------ update

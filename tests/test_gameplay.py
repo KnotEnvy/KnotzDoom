@@ -7,7 +7,7 @@ from knotzdoom.world import World
 def test_player_takes_damage_and_armor_absorbs(world):
     player = world.player
     player.give_armor(100, 1)
-    player.get_damage(30)
+    player.take_damage(30)
     assert player.health == 100 - (30 - 10)
     assert player.armor == 90
     assert world.fx.damage_flash > 0
@@ -15,14 +15,14 @@ def test_player_takes_damage_and_armor_absorbs(world):
 
 def test_player_dies_at_zero(world):
     player = world.player
-    player.get_damage(500)
+    player.take_damage(500)
     assert not player.alive and player.health == 0
     assert world.player_dead
 
 
 def test_god_mode_blocks_damage(world):
     world.player.god = True
-    world.player.get_damage(50)
+    world.player.take_damage(50)
     assert world.player.health == 100
 
 
@@ -159,7 +159,7 @@ def test_enemy_hears_gunfire(world):
     world.pathfinding.flood(world.player.map_pos)
     near = min(world.objects.npcs, key=lambda n: world.pathfinding.distance(n.map_pos) or 999)
     assert not near.alerted
-    world.noise(world.player.pos, 100)
+    world.noise(100)
     assert near.alerted
 
 

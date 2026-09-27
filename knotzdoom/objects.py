@@ -71,10 +71,10 @@ class ObjectHandler:
             projectile.update(dt)
         for particle in self.particles:
             particle.update(dt)
-        self.props = [p for p in self.props if p.alive]
-        self.pickups = [p for p in self.pickups if p.alive]
-        self.projectiles = [p for p in self.projectiles if p.alive]
-        self.particles = [p for p in self.particles if p.alive]
+        for name in ('props', 'pickups', 'projectiles', 'particles'):
+            items = getattr(self, name)
+            if any(not item.alive for item in items):
+                setattr(self, name, [item for item in items if item.alive])
 
     # ------------------------------------------------------------ effects
     def spawn_projectile(self, kind, x, y, angle, owner, damage, z=0.4):

@@ -60,23 +60,23 @@ class Projectile(AnimatedSprite):
         if self.owner == 'player':
             for target in world.objects.shootable():
                 if math.hypot(target.x - self.x, target.y - self.y) < target.radius + 0.15:
-                    target.take_damage(self.damage, source=self)
+                    target.take_damage(self.damage)
                     self.explode()
                     return True
         else:
             player = world.player
             if player.alive and math.hypot(player.x - self.x, player.y - self.y) < 0.5:
-                player.get_damage(self.damage, source=self)
-                self.explode(hit_player=True)
+                player.take_damage(self.damage)
+                self.explode()
                 return True
             for target in world.objects.barrels():
                 if math.hypot(target.x - self.x, target.y - self.y) < target.radius + 0.1:
-                    target.take_damage(self.damage, source=self)
+                    target.take_damage(self.damage)
                     self.explode()
                     return True
         return False
 
-    def explode(self, hit_player=False):
+    def explode(self):
         if not self.alive:
             return
         self.alive = False
@@ -88,9 +88,9 @@ class Projectile(AnimatedSprite):
             splash = d['splash_damage']
             if self.owner != 'player':
                 splash *= 0.6 * world.difficulty['dmg']
-            world.splash_damage(self.x, self.y, d['splash_radius'], splash, source=self)
+            world.splash_damage(self.x, self.y, d['splash_radius'], splash)
         if d['shake']:
             dist = math.hypot(world.player.x - self.x, world.player.y - self.y)
             if dist < 6:
                 world.fx.shake = max(world.fx.shake, int(d['shake'] * (1 - dist / 6)))
-        world.fx.light = max(world.fx.light, 120)
+        world.fx.flash_ms = max(world.fx.flash_ms, 120)

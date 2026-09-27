@@ -1,3 +1,37 @@
+# Status after the optimisation pass (2026-09-27)
+
+Everything below was acted on; this section records what landed so the report
+stays a useful history.  Measurements: `tools/timedemo.py e1m5` high detail
+11.5 -> 6.0 ms mean, low detail 5.5 -> 3.1 ms; `tools/perf_test.py 4` high
+10.1 -> 5.9 ms, low 4.4 -> 2.5 ms. The test suite grew from 49 to 70 tests.
+
+| Finding | Status |
+| --- | --- |
+| P1 / Q1 / B11-B14 | Done: `raycasting.walk` is one DDA per ray over `world.cells`; the same walk serves `line_of_sight` and a world-space `World.hitscan`; tangent spaced columns; slab tested in the camera's own cell; walk stops on distance. Raycast 3.3 -> 1.1 ms. |
+| P2 / B6 | Done: 1-texel strips scaled straight into the view surface, branches merged, shade inlined. Walls 5.4 -> 4.1 ms (the prototype's 3.2 was not reached; remaining cost is the C-level scale). |
+| P3 | Done earlier on the branch (View, auto/high/low). Auto still triggers on slow frames; default left at auto. |
+| P4 / P5 | Done: shaded source through an LRU (`Renderer.shaded_source`), colorkey conversion for binary-alpha frames (`assets.to_colorkey`), soft-alpha kept for projectiles. |
+| P6 | Done: opaque pause with baked dim (13.8 -> 0.9 ms), cached dims, demo at low detail, automap tile layer. |
+| P7 / B5 | Done: composed status bar rebuilt only on change (0.34 -> 0.04 ms), shared `DigitFont`, LRU text caches (512 entries). |
+| P8 | Done: no source caching, lazy shade banks, weapon frames scaled once, textures 1-5 and the candelabra resized offline (`tools/optimize_assets.py`), iCCP chunks gone. Music stays WAV (no OGG encoder available here). |
+| P9 | Done: flood only when the player's tile changes, own tile skipped inside `next_step`, list rebuilds only when something died. |
+| Q2 / Q7 | Done: `ui/` package (`menu`, `demo`, `screens`, `play`) with a `MenuState` base, `flow.py` for game flow and save payloads, `game.py` is a thin shell with no local imports. |
+| Q3 | Done: one `format_time`, `DigitFont`, pickups reuse `level.KEY_KINDS`, `Assets.sprite_frames`, autoplay reuses the monster rule. |
+| Q4 | Done: unused parameters, functions, constants and assets removed. |
+| Q5 | Done: timing and gameplay constants in `settings.py`, HUD layout table in `hud.py`, one door threshold for walking plus slab-exact tests for shots. |
+| Q6 | Done: `set_anim(restart=True)`, dist computed once, `bleeds` attribute, menu guard for all-disabled items, pistol ammo set once. |
+| Q8 | Partly: `perf_test.py` reads the real renderer phases; timers were not added inside `Renderer.render`. |
+| Q9 | Done where cheap: `Player.take_damage`, `Effects.flash_ms`, `x_side` for ray hits. `Door.open` and string owners kept. |
+| B1-B4, B7-B10, B15 | Done, each with a regression test in `tests/test_regressions.py` (fused barrels and in-flight projectiles are still not saved). |
+| R1 | Done: `KNOTZDOOM_DATA_DIR` redirects config, saves and records; tests use a temp dir; the smoke tool restores `pg.key.get_pressed`. |
+| R2 | Done: atomic writes, level fingerprint, validated payloads, INCOMPATIBLE / DAMAGED slots, migration hook. |
+| R3 | Done: `config.SCHEMA` coerces and clamps; records validated. |
+| R4 | Done: missing assets reported once at startup, levels validated on load with readable errors, no iCCP warnings. OGG conversion deferred. |
+| R5 | Done: regression tests, golden frames at both detail levels, a `perf` marked frame budget test. |
+| R6 | Done: `tools/timedemo.py`, `pyproject.toml`, runtime and dev requirements split. No CI configuration exists yet. |
+
+---
+
 # KnotzDoom review: performance, code quality, correctness, robustness
 
 Reviewed revision: **e6cec04**. All `file:line` references point at e6cec04 (`git show e6cec04:<path>`); function names are given too, so they can still be found after edits. While the review was running, a concurrent session pushed 71d5199, db10c1e, 2ec8a5c and 47f02a5 (runtime View with high/low detail, dead-code removal, a shared collision helper, table-driven pickups). Each finding carries a **Status @47f02a5** line. The runnable bug reproductions (B1–B5, B7–B10) were run on exported copies of both revisions and reproduce on both.

@@ -3,7 +3,7 @@ import random
 
 import pygame as pg
 
-from .settings import HEIGHT, STATUS_BAR_HEIGHT
+from .settings import GUNFIRE_NOISE_RADIUS, HEIGHT, STATUS_BAR_HEIGHT
 
 WEAPON_DEFS = {
     'pistol': {
@@ -55,10 +55,6 @@ class Weapon:
         return self.world.game.assets.weapon_frames(name, int(HEIGHT * d['height']))
 
     # ------------------------------------------------------------ logic
-    @property
-    def ready(self):
-        return self.cooldown <= 0 and self.seq_index < 0
-
     def update(self, dt):
         if self.cooldown > 0:
             self.cooldown -= dt
@@ -94,8 +90,8 @@ class Weapon:
         self.kick = d['kick']
         world = self.world
         world.audio.play(d['sound'])
-        world.fx.light = max(world.fx.light, 90)
-        world.noise(player.pos, 11)
+        world.fx.flash_ms = max(world.fx.flash_ms, 90)
+        world.noise(GUNFIRE_NOISE_RADIUS)
         if d['kind'] == 'hitscan':
             world.hitscan(player.angle, d['pellets'], d['spread'], d['damage'])
         elif d['kind'] == 'rocket':

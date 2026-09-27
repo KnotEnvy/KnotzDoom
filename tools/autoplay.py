@@ -38,14 +38,12 @@ class AutoPlayer:
 
     # ------------------------------------------------------------ graph
     def walkable(self, tile, keys):
+        """Like the monsters' rule, except the bot may use keys it holds and secret doors."""
         world = self.world
-        if tile in world.walls or tile in world.solid_tiles:
+        if tile in world.walls or tile in world.solid_tiles or not world.inside(*tile):
             return False
         door = world.doors.get(tile)
-        if door is not None and door.locked and door.locked not in keys:
-            return False
-        x, y = tile
-        return 0 <= x < world.level.cols and 0 <= y < world.level.rows
+        return door is None or not door.locked or door.locked in keys
 
     def bfs(self, start, keys):
         prev = {start: None}

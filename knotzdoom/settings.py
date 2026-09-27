@@ -25,12 +25,12 @@ SCREENSHOT_DIR = os.path.join(BASE_DIR, 'screenshots')
 RES = WIDTH, HEIGHT = 1600, 900
 HALF_WIDTH = WIDTH // 2
 HALF_HEIGHT = HEIGHT // 2
-FPS = 60                      # frame cap (0 = uncapped)
 TITLE = 'KnotzDoom'
 
 # ---------------------------------------------------------------- player
 PLAYER_SPEED = 0.004          # world units per millisecond
 PLAYER_SPRINT_MULT = 1.45
+PLAYER_START_BULLETS = 50
 PLAYER_ROT_SPEED = 0.0025       # radians per millisecond (arrow keys)
 PLAYER_RADIUS = 0.25          # collision radius in world units
 PLAYER_MAX_HEALTH = 100
@@ -57,12 +57,28 @@ SHADE_MIN_BRIGHT = 0.12       # brightness of the darkest level (0..1)
 # ---------------------------------------------------------------- hud
 STATUS_BAR_HEIGHT = 96         # the 3d view is drawn full screen; the bar overlays it
 
-# ---------------------------------------------------------------- gameplay
+# ---------------------------------------------------------------- doors
 DOOR_OPEN_TIME = 450           # ms for a door to slide fully open
 DOOR_STAY_OPEN = 4000          # ms a door stays open before closing
+DOOR_BLOCKED_RETRY = 800       # ms before a door blocked by a body tries to close again
 DOOR_PASSABLE = 0.9            # open fraction from which things can walk through
 DOOR_SLAB_THICKNESS = 0.12     # half thickness of the slab that stops shots and rockets
 USE_DISTANCE = 1.2             # how far the "use" action reaches
+
+# ---------------------------------------------------------------- timing (ms)
+LOS_INTERVAL = 100             # how often a monster re-checks line of sight
+PATH_INTERVAL = 120            # how often the flow field may be recomputed
+EXIT_DELAY = 900               # from the exit switch to the tally screen
+DEATH_SCREEN_DELAY = 1300      # from dying to the death screen
+LEVEL_FADE_IN = 700
+LEVEL_TITLE_TIME = 3500
+
+# ---------------------------------------------------------------- gameplay
+GUNFIRE_NOISE_RADIUS = 11      # path distance (tiles) within which monsters hear a shot
+BARREL_SPLASH_RADIUS = 1.9
+BARREL_SPLASH_DAMAGE = 90
+WEAPON_BOB_X = 9               # pixels of weapon sway while walking
+WEAPON_BOB_Y = 7
 
 DIFFICULTIES = [
     # name, description, enemy hp mult, enemy damage mult, ammo mult, enemy speed mult, skip every nth enemy

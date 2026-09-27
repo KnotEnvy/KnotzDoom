@@ -7,8 +7,8 @@ from .objects import ObjectHandler
 from .pathfinding import PathFinding
 from .player import Player
 from .raycasting import line_of_sight, trace
-from .settings import (DIFFICULTIES, DOOR_OPEN_TIME, DOOR_PASSABLE, DOOR_STAY_OPEN, DOOR_SLAB_THICKNESS,
-                       MAX_DEPTH, PLAYER_RADIUS)
+from .settings import (DIFFICULTIES, DOOR_BLOCKED_RETRY, DOOR_OPEN_TIME, DOOR_PASSABLE, DOOR_SLAB_THICKNESS,
+                       DOOR_STAY_OPEN, MAX_DEPTH, PLAYER_RADIUS)
 
 
 class Effects:
@@ -18,13 +18,13 @@ class Effects:
         self.damage_flash = 0      # alpha of the red overlay
         self.bonus_flash = 0       # alpha of the yellow overlay
         self.shake = 0             # pixels
-        self.light = 0             # ms of extra brightness (muzzle flash / explosion)
+        self.flash_ms = 0          # ms of extra brightness left (muzzle flash / explosion)
 
     def update(self, dt):
         self.damage_flash = max(0, self.damage_flash - dt * 0.45)
         self.bonus_flash = max(0, self.bonus_flash - dt * 0.4)
         self.shake = max(0, self.shake - dt * 0.03)
-        self.light = max(0, self.light - dt)
+        self.flash_ms = max(0, self.flash_ms - dt)
 
 
 class Door:
@@ -82,7 +82,7 @@ class Door:
             self.timer -= dt
             if self.timer <= 0:
                 if self.world.tile_occupied(self.pos):
-                    self.timer = 800
+                    self.timer = DOOR_BLOCKED_RETRY
                 else:
                     self.state = 'closing'
                     self.world.audio.play('door_close', pos=self.pos)
@@ -235,10 +235,6 @@ class World:
     def drawable_sprites(self):
         return self.objects.drawable()
 
-    @property
-    def enemies_left(self):
-        return sum(1 for npc in self.objects.npcs if npc.is_alive)
-
     # ------------------------------------------------------------ update
     def update(self, dt):
         self.fx.update(dt)
@@ -281,7 +277,7 @@ class World:
     def on_player_death(self):
         self.player_dead = True
 
-    def trigger_exit(self, tile=None):
+    def trigger_exit(self):
         if self.exit_triggered:
             return
         self.exit_triggered = True
@@ -293,8 +289,8 @@ class World:
         self.audio.play('level_complete')
         self.player.firing = False
 
-    def noise(self, pos, radius):
-        """Wake up enemies that can 'hear' a shot fired at ``pos``."""
+    def noise(self, radius):
+        """Wake up enemies within ``radius`` path steps of the player (they heard a shot)."""
         for npc in self.objects.npcs:
             if not npc.is_alive or npc.alerted:
                 continue
@@ -323,7 +319,7 @@ class World:
                 if across <= target.radius:
                     best, best_dist = target, along
             if best is not None:
-                best.take_damage(random.randint(*damage_range), source=player)
+                best.take_damage(random.randint(*damage_range))
                 if best.bleeds:
                     # blood slightly towards the shooter so it is not hidden inside the sprite
                     self.objects.spawn_blood((best.x - cos_a * 0.2, best.y - sin_a * 0.2), best.scale * 0.55)
@@ -331,16 +327,16 @@ class World:
                 dist = wall_dist - 0.12
                 self.objects.spawn_puff((player.x + cos_a * dist, player.y + sin_a * dist), random.uniform(0.3, 0.6))
 
-    def splash_damage(self, x, y, radius, damage, source=None):
+    def splash_damage(self, x, y, radius, damage):
         """Radius damage with falloff; walls shield things behind them."""
         for target in self.objects.shootable():
             d = math.hypot(target.x - x, target.y - y)
             if d < radius and line_of_sight(self, x, y, target.x, target.y):
-                target.take_damage(int(damage * (1.0 - d / radius)) + 1, source=source)
+                target.take_damage(int(damage * (1.0 - d / radius)) + 1)
         player = self.player
         d = math.hypot(player.x - x, player.y - y)
         if d < radius and player.alive and line_of_sight(self, x, y, player.x, player.y):
-            player.get_damage(int(damage * 0.7 * (1.0 - d / radius)), source=source)
+            player.take_damage(int(damage * 0.7 * (1.0 - d / radius)))
 
     def spawn_rocket(self, x, y, angle, owner='player', damage=100, z=0.4):
         return self.objects.spawn_projectile('rocket', x, y, angle, owner, damage, z)

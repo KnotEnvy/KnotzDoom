@@ -49,6 +49,8 @@ class HUD:
         self.automap_scale = 14
         self.automap_layer = None
         self.automap_layer_key = None
+        self.automap_dim = pg.Surface((WIDTH, HEIGHT - STATUS_BAR_HEIGHT), pg.SRCALPHA)
+        self.automap_dim.fill((0, 0, 0, 170))
 
     # ------------------------------------------------------------ building
     def build_bar(self):
@@ -230,8 +232,7 @@ class HUD:
     def draw_automap(self, screen, world):
         s = self.automap_scale
         view_h = HEIGHT - STATUS_BAR_HEIGHT
-        dim = self.game.dim_surface((WIDTH, view_h), 170)
-        screen.blit(dim, (0, 0))
+        screen.blit(self.automap_dim, (0, 0))
         player = world.player
         ox = HALF_WIDTH - player.x * s
         oy = view_h // 2 - player.y * s

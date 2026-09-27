@@ -1,4 +1,7 @@
-"""The Game: window, main loop, state stack and level / save flow."""
+"""The Game: window, clock, state stack and the main loop.
+
+Level sequencing, tallies and saving live in ``flow``; the screens in ``ui``.
+"""
 import json
 import os
 import sys
@@ -6,13 +9,14 @@ import time
 
 import pygame as pg
 
-from . import __version__, saves
+from . import __version__, flow
 from .assets import Assets
 from .audio import Audio
 from .config import Config
 from .fonts import Fonts
 from .level import load_episode, load_level
-from .settings import BASE_DIR, DIFFICULTIES, RECORDS_PATH, RES, SCREENSHOT_DIR, TITLE
+from .settings import BASE_DIR, RECORDS_PATH, RES, SCREENSHOT_DIR, TITLE
+from .ui import DemoBackground, MainMenuState, PauseState, TitleState, draw_dim
 from .view import DetailController
 
 
@@ -41,8 +45,6 @@ class Game:
         self.running = True
         self.mouse_grabbed = False
         self.injected_events = []
-        self._dims = {}
-        from .states import DemoBackground, TitleState
         self.demo = DemoBackground(self)
         self.push(TitleState(self))
         self.report_missing_assets()
@@ -102,15 +104,13 @@ class Game:
     def pop(self):
         if not self.states:
             return
-        state = self.states.pop()
-        state.exit()
+        self.states.pop().exit()
         if self.states:
             self.states[-1].resume()
 
     def replace(self, state):
         if self.states:
-            old = self.states.pop()
-            old.exit()
+            self.states.pop().exit()
         self.push(state)
 
     def clear_states(self):
@@ -118,123 +118,34 @@ class Game:
             self.states.pop().exit()
 
     def to_title(self):
-        from .states import TitleState
         self.clear_states()
         self.push(TitleState(self))
 
     def to_main_menu(self):
-        from .states import MainMenuState
         self.clear_states()
         self.push(MainMenuState(self))
 
-    # ------------------------------------------------------------ game flow
+    # ------------------------------------------------------------ flow (see flow.py)
     def start_new_game(self, difficulty_index):
-        from .states import StoryState
-        self.session = {'difficulty': difficulty_index, 'results': [], 'deaths': 0, 'carry': None,
-                        'started': time.time()}
-        intro = self.episode.get('intro', '')
-        if intro:
-            self.clear_states()
-            self.push(StoryState(self, intro, on_done=lambda: self.begin_level(0), music='intermission'))
-        else:
-            self.begin_level(0)
+        flow.start_new_game(self, difficulty_index)
 
     def begin_level(self, index):
-        """Show the level's story text (if any), then start it."""
-        from .states import StoryState
-        level = self.level_data(index)
-        difficulty = self.session.get('difficulty', 1)
-        if level.story:
-            self.clear_states()
-            self.push(StoryState(self, level.story, on_done=lambda: self.start_level(index, difficulty, self.session.get('carry')),
-                                 music='intermission', background=str(level.default_wall)))
-        else:
-            self.start_level(index, difficulty, self.session.get('carry'))
+        flow.begin_level(self, index)
 
     def start_level(self, index, difficulty_index, carry_state=None, restore=None):
-        from .states import PlayState
-        self.session.setdefault('difficulty', difficulty_index)
-        self.session.setdefault('results', [])
-        self.session.setdefault('deaths', 0)
-        self.session['difficulty'] = difficulty_index
-        self.session['carry'] = carry_state
-        self.session['level_index'] = index
-        self.clear_states()
-        self.push(PlayState(self, index, difficulty_index, carry_state, restore))
+        flow.start_level(self, index, difficulty_index, carry_state, restore)
 
     def level_complete(self, play):
-        from .states import IntermissionState
-        world = play.world
-        results = dict(world.stats)
-        results['time'] = world.time
-        results['score'] = world.player.score
-        results['level'] = world.level.id
-        self.session.setdefault('results', []).append(results)
-        self.session['carry'] = world.player.carry_state()
-        self.replace(IntermissionState(self, play, results))
+        flow.level_complete(self, play)
 
     def finish_episode(self):
-        from .states import VictoryState
-        totals = {'kills': 0, 'kills_total': 0, 'items': 0, 'items_total': 0,
-                  'secrets': 0, 'secrets_total': 0, 'time': 0, 'score': 0,
-                  'deaths': self.session.get('deaths', 0), 'difficulty': self.session.get('difficulty', 1)}
-        for result in self.session.get('results', []):
-            for key in ('kills', 'kills_total', 'items', 'items_total', 'secrets', 'secrets_total', 'time'):
-                totals[key] += result.get(key, 0)
-            totals['score'] = result.get('score', totals['score'])
-        self.clear_states()
-        outro = self.episode.get('outro', '')
-        if outro:
-            from .states import StoryState
-            self.push(StoryState(self, outro, on_done=lambda: self.replace(VictoryState(self, totals)),
-                                 music='intermission', background='4'))
-        else:
-            self.push(VictoryState(self, totals))
+        flow.finish_episode(self)
 
-    # ------------------------------------------------------------ saving
     def save_game(self, slot, play):
-        world = play.world
-        if not world.player.alive:
-            world.message('Cannot save while dead.')
-            return False
-        payload = {
-            'level_index': play.level_index,
-            'level_name': world.level.name,
-            'level_hash': saves.level_fingerprint(world.level),
-            'difficulty': world.difficulty_index,
-            'difficulty_name': DIFFICULTIES[world.difficulty_index]['name'],
-            'session': {k: v for k, v in self.session.items() if k != 'carry'},
-            'carry': self.session.get('carry'),
-            'world': world.save_state(),
-        }
-        try:
-            saves.write_save(slot, payload)
-        except OSError as exc:
-            world.message(f'Could not save: {exc}')
-            self.audio.play('door_locked')
-            return False
-        world.message('Game saved.' if slot else 'Quick save done.')
-        self.audio.play('tally_done')
-        return True
+        return flow.save_game(self, slot, play)
 
     def load_game(self, slot):
-        data, problem = saves.read_save_status(slot, self.level_count)
-        if data is None:
-            self.notify({'empty': 'No saved game in that slot.',
-                         'incompatible': 'That save is from an older version of the game.',
-                         'corrupt': 'That save file is damaged.'}.get(problem, 'Cannot load that save.'))
-            self.audio.play('door_locked')
-            return False
-        level = self.level_data(data['level_index'])
-        if data.get('level_hash') not in (None, saves.level_fingerprint(level)):
-            self.notify('That save was made on a different version of the level.')
-            self.audio.play('door_locked')
-            return False
-        self.session = dict(data.get('session', {}))
-        self.session['carry'] = data.get('carry')
-        self.start_level(data['level_index'], data['difficulty'], data.get('carry'), restore=data['world'])
-        self.state.world.message('Game loaded.')
-        return True
+        return flow.load_game(self, slot)
 
     def notify(self, text):
         """Show a message in the game if a world is on screen, else print it."""
@@ -246,28 +157,6 @@ class Game:
         print(text)
 
     # ------------------------------------------------------------ window
-    def dim_surface(self, size, alpha):
-        """A cached translucent black surface for dimming backdrops."""
-        key = (tuple(size), int(alpha))
-        surf = self._dims.get(key)
-        if surf is None:
-            surf = pg.Surface(size, pg.SRCALPHA)
-            surf.fill((0, 0, 0, int(alpha)))
-            self._dims[key] = surf
-        return surf
-
-    def set_mouse_grab(self, grab):
-        self.mouse_grabbed = grab
-        if self.headless:
-            return
-        try:
-            pg.mouse.set_visible(not grab)
-            pg.event.set_grab(grab)
-            if grab:
-                pg.mouse.get_rel()
-        except pg.error:
-            pass
-
     def make_screen(self):
         """Create the window.  The game renders at a fixed 1600x900; on
         smaller desktops (or in fullscreen) pygame's SCALED mode fits it to
@@ -298,6 +187,29 @@ class Game:
         self.screen = self.make_screen()
         self.config.save()
 
+    def draw_backdrop(self, screen, dim=170):
+        """Background for overlay menus: the paused game view if we are in a
+        game, otherwise the rotating demo level."""
+        snapshot = next((s.snapshot for s in reversed(self.states)
+                         if isinstance(s, PauseState) and s.snapshot is not None), None)
+        if snapshot is not None:
+            screen.blit(snapshot, (0, 0))
+        else:
+            self.demo.draw(screen)
+        draw_dim(screen, dim)
+
+    def set_mouse_grab(self, grab):
+        self.mouse_grabbed = grab
+        if self.headless:
+            return
+        try:
+            pg.mouse.set_visible(not grab)
+            pg.event.set_grab(grab)
+            if grab:
+                pg.mouse.get_rel()
+        except pg.error:
+            pass
+
     def screenshot(self, path=None):
         os.makedirs(SCREENSHOT_DIR, exist_ok=True)
         if path is None:
@@ -310,41 +222,22 @@ class Game:
 
     # ------------------------------------------------------------ loop
     def check_events(self):
-        events = list(self.injected_events)
+        events = self.injected_events
         self.injected_events = []
         events.extend(pg.event.get())
         for event in events:
             if event.type == pg.QUIT:
                 self.quit()
-                continue
-            if event.type == pg.KEYDOWN and event.key == pg.K_F12:
+            elif event.type == pg.KEYDOWN and event.key == pg.K_F12:
                 self.screenshot()
-                continue
-            state = self.state
-            if state is not None:
-                state.handle_event(event)
+            elif self.state is not None:
+                self.state.handle_event(event)
             if not self.running:
                 break
 
     def update(self, dt):
-        state = self.state
-        if state is not None:
-            state.update(dt)
-
-    def draw_backdrop(self, screen, dim=170):
-        """Background for overlay menus: the paused game view if we are in a
-        game, otherwise the rotating demo level."""
-        from .states import PauseState, draw_dim
-        snapshot = None
-        for state in reversed(self.states):
-            if isinstance(state, PauseState) and state.snapshot is not None:
-                snapshot = state.snapshot
-                break
-        if snapshot is not None:
-            screen.blit(snapshot, (0, 0))
-        else:
-            self.demo.draw(screen)
-        draw_dim(screen, dim)
+        if self.state is not None:
+            self.state.update(dt)
 
     def draw(self):
         # draw from the lowest non-transparent state upwards

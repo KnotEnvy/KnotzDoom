@@ -8,16 +8,19 @@ nobody clips through wall corners.
 """
 from collections import deque
 
+from .settings import PATH_INTERVAL
+
 STEPS = ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, -1), (1, 1), (-1, 1))
 
 
 class PathFinding:
-    def __init__(self, world, interval=120):
+    def __init__(self, world, interval=PATH_INTERVAL):
         self.world = world
         self.interval = interval
         self.timer = interval          # compute immediately on first update
         self.graph = {}
         self.dist = {}
+        self.goal = None
         self.build_graph()
 
     def passable(self, tile):
@@ -60,14 +63,18 @@ class PathFinding:
                 self.graph[t] = self.neighbours(t)
             else:
                 self.graph.pop(t, None)
+        self.goal = None                       # force a re-flood on the next update
 
     def update(self, dt):
         self.timer += dt
         if self.timer >= self.interval:
             self.timer = 0
-            self.flood(self.world.player.map_pos)
+            goal = self.world.player.map_pos
+            if goal != self.goal:              # the field only changes when the player changes tile
+                self.flood(goal)
 
     def flood(self, goal):
+        self.goal = goal
         dist = {goal: 0}
         queue = deque([goal])
         graph = self.graph
@@ -81,12 +88,13 @@ class PathFinding:
         self.dist = dist
 
     def next_step(self, tile, occupied=()):
-        """The neighbour of ``tile`` closest to the player, avoiding ``occupied`` tiles."""
+        """The neighbour of ``tile`` closest to the player, avoiding ``occupied``
+        tiles (the mover's own tile is never counted as occupied)."""
         best = None
         best_d = self.dist.get(tile, 1 << 30)
         for nxt in self.graph.get(tile, ()):
             d = self.dist.get(nxt)
-            if d is None or nxt in occupied:
+            if d is None or (nxt in occupied and nxt != tile):
                 continue
             if d < best_d:
                 best_d = d

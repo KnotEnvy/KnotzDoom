@@ -3,7 +3,7 @@ import pygame as pg
 
 from knotzdoom.npc import NPC
 from knotzdoom.pickups import Barrel
-from knotzdoom.states import DeathState, IntermissionState, PauseState, PlayState
+from knotzdoom.ui import DeathState, IntermissionState, PauseState, PlayState
 from knotzdoom.world import World
 
 
@@ -18,10 +18,10 @@ def test_b1_dying_during_the_exit_delay_does_not_finish_the_level(game):
     play = start(game)
     world = play.world
     world.trigger_exit()
-    world.player.get_damage(500)                  # cannot hurt you after the switch
+    world.player.take_damage(500)                  # cannot hurt you after the switch
     assert world.player.alive and world.player.health > 0
     world.exit_triggered = False                  # now die for real, then hit the switch while dying
-    world.player.get_damage(500)
+    world.player.take_damage(500)
     assert not world.player.alive
     world.trigger_exit()
     for _ in range(120):
@@ -113,7 +113,7 @@ def test_b10_fire_rate_does_not_depend_on_frame_rate(game):
         world = World(game, game.level_data(0), 1)
         world.renderer = Renderer(game, world)
         player = world.player
-        player.give_weapon('chaingun', announce=False)
+        player.give_weapon('chaingun')
         player.select_weapon('chaingun', instant=True)
         player.ammo['bullets'] = 200
         weapon = player.weapon
