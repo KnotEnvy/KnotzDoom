@@ -38,6 +38,7 @@ import argparse          # noqa: E402
 import math              # noqa: E402
 import random            # noqa: E402
 import sys               # noqa: E402
+import time              # noqa: E402
 import wave              # noqa: E402
 import zlib              # noqa: E402
 
@@ -344,9 +345,6 @@ class Canvas:
         a = amt[mask][:, None]
         self.rgb[mask] = self.rgb[mask] * (1 - a) + c * a
 
-    def brighten(self, mask, factor):
-        self.rgb[mask] = np.clip(self.rgb[mask] * factor, 0, 255)
-
     def glow(self, cx, cy, r, color, strength=0.6, power=2.0, add_alpha=True):
         """Soft additive halo (used for lights, magic and fire)."""
         f = self.radial(cx, cy, r) ** power * strength
@@ -392,12 +390,6 @@ class Canvas:
         safe = np.where(out_a > 0, out_a, 1)
         self.rgb[dy0:dy0 + h, dx0:dx0 + w] = (src * sa + dst * da * (1 - sa)) / safe
         self.alpha[dy0:dy0 + h, dx0:dx0 + w] = out_a[..., 0]
-
-    def shifted(self, dx, dy):
-        """Copy of the canvas with the contents moved (transparent fill)."""
-        c = Canvas(self.w, self.h)
-        c.blit(self, dx, dy)
-        return c
 
     def flipped(self):
         c = Canvas(self.w, self.h)
@@ -483,7 +475,6 @@ def metal_base(c, rng, ramp='gunmetal', level=0.45, spread=0.3, brushed=True):
     t = level + (n - 0.5) * spread
     if brushed:
         streak = value_noise(c.h, c.w, 3, rng)
-        streak = np.roll(streak, 0, 1)
         stretched = fbm(c.h, c.w, 2, 1, 0.5, rng)
         # stretch horizontally by averaging along x
         stretched = np.mean([np.roll(stretched, k, axis=1) for k in range(-12, 13, 3)], axis=0)
@@ -879,7 +870,7 @@ def gen_sky_night():
     moon = c.circle(mx, my, 16)
     c.glow(mx, my, 48, (150, 160, 210), 0.35, 2.0, add_alpha=False)
     c.fill(moon, [(150, 150, 170), (196, 196, 214), (228, 228, 240), (250, 250, 255)], c.sphere(mx, my, 16, (-0.3, -0.3)) * 0.7 + 0.3)
-    c.tint(c.circle(mx + 6, my - 4, 12) & moon, (26, 28, 60), 0.0)
+    c.tint(c.circle(mx + 6, my - 4, 12) & moon, (14, 16, 44), 0.85)          # crescent
     # dark purple clouds, denser toward the horizon
     cl = fbm(H, W, 160, 5, 0.55, rng, tile_x=True, tile_y=False) + (v - 0.5) * 0.35
     mask = cl > 0.52
@@ -945,10 +936,10 @@ def finish(c, rng, grit=0.08):
 def gen_stimpack():
     rng = seed_for('stimpack')
     c = Canvas(64, 64)
-    box3d(c, 20, 42, 20, 20, 4, RAMPS['white'], RAMPS['white'], RAMPS['white'], rng, 0.6, 0.85, 0.35)
-    c.tint(c.rect(20, 49, 20, 1), (80, 80, 90), 0.5)                 # lid seam
-    cr = cross_mask(c, 30, 55, 9, 3)
-    c.fill(cr, RAMPS['red'], 0.5 + (1 - c.grad_v(50, 60)) * 0.3)
+    box3d(c, 19, 38, 22, 24, 5, RAMPS['white'], RAMPS['white'], RAMPS['white'], rng, 0.6, 0.85, 0.35)
+    c.tint(c.rect(19, 47, 22, 1), (80, 80, 90), 0.5)                 # lid seam
+    cr = cross_mask(c, 30, 54, 11, 3)
+    c.fill(cr, RAMPS['red'], 0.5 + (1 - c.grad_v(48, 60)) * 0.3)
     finish(c, rng)
     save_sprite(c, 'sprites', 'pickups', 'stimpack.png')
 
@@ -1026,14 +1017,14 @@ def gen_shells():
     rng = seed_for('shells')
     c = Canvas(64, 64)
     for i in range(4):
-        x = 17 + i * 8
-        shell = c.rect(x, 44, 6, 13)
-        c.fill(shell, RAMPS['red'], 0.35 + c.cyl(x, x + 6, 0.3) * 0.5, grit=0.2, rng=rng)
-        base = c.rect(x, 57, 6, 5)
-        c.fill(base, RAMPS['brass'], 0.4 + c.cyl(x, x + 6, 0.3) * 0.5)
-        c.tint(c.rect(x, 44, 6, 1), (0, 0, 0), 0.5)                  # crimp
-        c.tint(c.rect(x, 56, 6, 1), (0, 0, 0), 0.45)
-        c.paint(c.rect(x + 1, 46, 1, 8), (250, 140, 110))
+        x = 15 + i * 9
+        shell = c.rect(x, 38, 7, 18)
+        c.fill(shell, RAMPS['red'], 0.35 + c.cyl(x, x + 7, 0.3) * 0.5, grit=0.2, rng=rng)
+        base = c.rect(x, 56, 7, 6)
+        c.fill(base, RAMPS['brass'], 0.4 + c.cyl(x, x + 7, 0.3) * 0.5)
+        c.tint(c.rect(x, 38, 7, 1), (0, 0, 0), 0.5)                  # crimp
+        c.tint(c.rect(x, 55, 7, 1), (0, 0, 0), 0.45)
+        c.paint(c.rect(x + 1, 40, 1, 12), (250, 140, 110))
     finish(c, rng)
     save_sprite(c, 'sprites', 'pickups', 'shells.png')
 
@@ -1126,24 +1117,26 @@ def gen_soulsphere():
         c = Canvas(64, 64)
         cx, cy, r = 32, 40, 21
         pulse = 0.5 + 0.5 * math.sin(frame * math.pi / 2)            # 0..1..0
-        c.glow(cx, cy, r + 9 + int(pulse * 5), (90, 150, 255), 0.35 + pulse * 0.3, 1.6)
+        c.glow(cx, cy, r + 10 + int(pulse * 6), (110, 170, 255), 0.5 + pulse * 0.35, 1.5)
         body = c.circle(cx, cy, r)
-        shade = np.clip(c.sphere(cx, cy, r, (-0.35, -0.5)) * 0.8 + 0.05 + pulse * 0.1, 0, 1)
-        c.fill(body, RAMPS['soul'], shade, grit=0.15, rng=rng, alpha=0.78 + pulse * 0.08)
+        shade = np.clip(c.sphere(cx, cy, r, (-0.35, -0.5)) * 0.7 + 0.05 + pulse * 0.1, 0, 1)
+        c.fill(body, RAMPS['soul'], shade, grit=0.15, rng=rng, alpha=0.8 + pulse * 0.08)
         rim = body & ~c.circle(cx, cy, r - 2)
         c.tint(rim, (150, 196, 255), 0.5)
         c.alpha[rim] = 0.92
-        # faint ghostly face
-        face = c.ellipse(cx - 11, cy - 10, 22, 24)
-        fa = 0.45 + pulse * 0.25
-        c.tint(face, (240, 246, 255), fa * (0.4 + 0.6 * c.radial(cx, cy + 1, 13)))
-        for ex in (cx - 6, cx + 2):
-            eye = c.ellipse(ex, cy - 6, 5, 7)
-            c.tint(eye, (20, 30, 110), 0.9)
-        c.tint(c.ellipse(cx - 4, cy + 4, 8, 6), (20, 30, 110), 0.8)  # mouth
-        c.tint(c.rect(cx - 1, cy - 1, 2, 3), (20, 30, 110), 0.5)     # nose
-        c.paint(c.circle(cx - 8, cy - 9, 3), (230, 240, 255))        # specular
-        c.paint(c.rect(cx - 6, cy - 12, 1, 1), (255, 255, 255))
+        # ghostly white face floating inside
+        face = c.ellipse(cx - 10, cy - 11, 21, 25)
+        fa = 0.6 + pulse * 0.3
+        c.tint(face, (236, 244, 255), np.floor(fa * (0.45 + 0.55 * c.radial(cx, cy, 14)) * 6 + c._bayer) / 6)
+        for ex in (cx - 7, cx + 2):
+            eye = c.ellipse(ex, cy - 7, 6, 8)
+            c.paint(eye, (18, 26, 96))
+            c.paint(c.rect(ex + 2, cy - 4, 2, 2), (110, 150, 240))   # eye glint
+        mouth = c.ellipse(cx - 4, cy + 3, 9, 8)
+        c.paint(mouth, (18, 26, 96))
+        c.tint(c.rect(cx - 1, cy - 1, 2, 2), (18, 26, 96), 0.7)      # nose
+        c.paint(c.circle(cx - 9, cy - 10, 3), (230, 240, 255))       # specular
+        c.paint(c.rect(cx - 7, cy - 13, 1, 1), (255, 255, 255))
         c.outline((10, 16, 60), thresh=0.6)
         save_sprite(c, 'sprites', 'pickups', 'soulsphere', '%d.png' % frame)
 
@@ -1151,7 +1144,7 @@ def gen_soulsphere():
 def gen_weapon_shotgun():
     rng = seed_for('weapon_shotgun')
     c = Canvas(96, 48)
-    stock = c.poly([(70, 18), (90, 15), (94, 22), (92, 33), (76, 34), (70, 30)])
+    stock = c.poly([(68, 19), (90, 15), (94, 19), (93, 31), (82, 33), (72, 31), (68, 27)])
     c.fill(stock, RAMPS['wood'], 0.35 + c.cyl_v(15, 34, 0.3) * 0.5, grit=0.25, rng=rng)
     rec = c.rect(54, 17, 18, 13)
     c.fill(rec, RAMPS['gunmetal'], 0.3 + c.cyl_v(17, 30, 0.25) * 0.5, grit=0.2, rng=rng)
@@ -1270,3 +1263,1305 @@ def gen_pickups():
     gen_backpack()
 
 
+# ---------------------------------------------------------------------------
+# 3b. sprites - decorations
+# ---------------------------------------------------------------------------
+def gen_barrel():
+    for frame in range(2):
+        rng = seed_for('barrel%d' % frame)
+        c = Canvas(64, 96)
+        x0, x1 = 10, 54
+        body = c.rect(x0, 22, 44, 62) | c.ellipse(x0, 76, 44, 16)
+        shade = 0.15 + c.cyl(x0, x1, 0.35) * 0.7
+        c.fill(body, RAMPS['barrel'], shade, grit=0.25, rng=rng)
+        for ry in (36, 62):                                          # raised rings
+            c.fill(c.rect(x0, ry, 44, 4), RAMPS['barrel'], np.clip(shade + 0.25, 0, 1), grit=0.2, rng=rng)
+            c.tint(c.rect(x0, ry + 4, 44, 1), (0, 0, 0), 0.55)
+            c.tint(c.rect(x0, ry - 1, 44, 1), (0, 0, 0), 0.3)
+        # hazard triangle stencil
+        tri = c.poly([(32, 44), (24, 58), (40, 58)]) & ~c.poly([(32, 49), (27, 56), (37, 56)])
+        c.fill(tri, RAMPS['yellow'], 0.5 + (c.noise(3, rng, 2) - 0.5) * 0.4)
+        c.paint(c.rect(31, 50, 2, 4), (222, 182, 28))
+        c.paint(c.rect(31, 55, 2, 1), (222, 182, 28))
+        # top rim + glowing goo
+        rim = c.ellipse(x0, 14, 44, 16)
+        c.fill(rim, RAMPS['barrel'], 0.1 + c.grad_v(14, 30) * 0.5, grit=0.2, rng=rng)
+        goo = c.ellipse(x0 + 3, 16, 38, 12)
+        gt = c.radial(32, 22, 20) * 0.7 + 0.2 + (c.noise(5, rng, 2) - 0.5) * 0.4 + frame * 0.12
+        c.fill(goo, RAMPS['toxic'], np.clip(gt, 0, 1), grit=0.2, rng=rng)
+        bubbles = [(24, 20, 2), (38, 24, 3), (30, 26, 1)] if frame == 0 else [(28, 24, 3), (40, 19, 2), (22, 23, 1), (34, 21, 1)]
+        for bx, by, br in bubbles:
+            c.tint(c.circle(bx, by, br), (240, 255, 200), 0.8)
+            c.tint(c.circle(bx, by, br + 1) & ~c.circle(bx, by, br), (24, 84, 12), 0.6)
+        for dx, dl in ((16, 14), (44, 9)):                           # drips
+            drip = c.rect(dx, 28, 2, dl) | c.circle(dx + 1, 28 + dl, 2)
+            c.tint(drip & body, (124, 230, 40), 0.85)
+        c.tint(c.rect(x0, 26, 44, 12) & body, (120, 230, 40), (1 - c.grad_v(26, 38)) * 0.35)
+        finish(c, rng)
+        c.glow(32, 20, 30, (120, 255, 80), 0.35 + frame * 0.2, 2.2)
+        save_sprite(c, 'sprites', 'decorations', 'barrel', '%d.png' % frame)
+
+
+def gen_pillar():
+    rng = seed_for('pillar')
+    c = Canvas(64, 128)
+    shaft = c.rect(20, 25, 24, 88)
+    c.fill(shaft, RAMPS['stone'], 0.15 + c.cyl(20, 44, 0.35) * 0.65, grit=0.3, rng=rng)
+    for fx in (25, 31, 37):                                          # flutes
+        c.tint(c.rect(fx, 27, 1, 84), (0, 0, 0), 0.45)
+        c.tint(c.rect(fx + 1, 27, 1, 84), (255, 255, 255), 0.2)
+    for x, y, w, h, t in ((16, 19, 32, 6, 0.55), (11, 11, 42, 8, 0.6), (16, 113, 32, 6, 0.45), (11, 119, 42, 8, 0.5)):
+        m = c.rect(x, y, w, h)
+        c.fill(m, RAMPS['stone'], t + c.cyl(x, x + w, 0.35) * 0.3 - c.grad_v(y, y + h) * 0.15, grit=0.3, rng=rng)
+        c.tint(c.rect(x, y, w, 1), (255, 255, 255), 0.3)
+        c.tint(c.rect(x, y + h - 1, w, 1), (0, 0, 0), 0.5)
+    crack = c.line((24, 50), (30, 70), 1) | c.line((30, 70), (27, 82), 1) | c.line((36, 90), (40, 104), 1)
+    c.tint(crack, (0, 0, 0), 0.5)
+    moss = (c.noise(6, rng, 2) > 0.58) & (c.yy > 88) & (c.alpha > 0)
+    c.tint(moss, (60, 92, 40), 0.55)
+    finish(c, rng)
+    save_sprite(c, 'sprites', 'decorations', 'pillar.png')
+
+
+def skull(c, cx, cy, r, rng):
+    cran = c.circle(cx, cy, r)
+    jaw = c.rect(cx - int(r * 0.65), cy, int(r * 1.3), int(r * 0.9))
+    m = cran | jaw
+    c.tint(dilate(m) & ~m & (c.alpha > 0), (10, 8, 8), 0.7)         # separate it from neighbours
+    c.fill(m, RAMPS['bone'], 0.15 + c.sphere(cx, cy, r * 1.15, (-0.4, -0.5)) * 0.75, grit=0.25, rng=rng)
+    ew, eh = max(2, int(r * 0.45)), max(2, int(r * 0.55))
+    for ex in (cx - int(r * 0.5), cx + int(r * 0.1)):
+        c.paint(c.ellipse(ex, cy - int(r * 0.4), ew, eh), (14, 10, 10))
+    c.paint(c.rect(cx - 1, cy + 1, 2, 2), (30, 24, 20))
+    for tx in range(cx - int(r * 0.5), cx + int(r * 0.5), 2):
+        c.paint(c.rect(tx, cy + int(r * 0.6), 1, 2), (30, 24, 20))
+    return m
+
+
+def gen_skulls():
+    rng = seed_for('skulls')
+    c = Canvas(64, 48)
+    for bx, by, bl in ((3, 42, 16), (44, 43, 17)):                   # loose bones
+        bone = c.rect(bx + 2, by, bl - 4, 3) | c.circle(bx + 2, by + 1, 2) | c.circle(bx + bl - 2, by + 1, 2)
+        c.fill(bone, RAMPS['bone'], 0.3 + c.cyl_v(by - 1, by + 3, 0.3) * 0.5, grit=0.2, rng=rng)
+    for cx, cy in ((15, 38), (32, 39), (49, 38)):
+        skull(c, cx, cy, 7, rng)
+    for cx, cy in ((23, 27), (41, 27)):
+        skull(c, cx, cy, 7, rng)
+    skull(c, 32, 15, 7, rng)
+    finish(c, rng)
+    save_sprite(c, 'sprites', 'decorations', 'skulls.png')
+
+
+def gen_decorations():
+    gen_barrel()
+    gen_pillar()
+    gen_skulls()
+
+
+# ---------------------------------------------------------------------------
+# 3c. sprites - projectiles
+# ---------------------------------------------------------------------------
+def angular_noise(c, cx, cy, lobes, rng, phase=0.0):
+    """Periodic 1-D noise around (cx, cy) as a function of angle, in [0, 1]."""
+    ang = np.arctan2(c.yy - cy, c.xx - cx)
+    vals = rng.random_sample(lobes)
+    u = ((ang / math.tau + phase) % 1.0) * lobes
+    i0 = np.floor(u).astype(int) % lobes
+    i1 = (i0 + 1) % lobes
+    f = u - np.floor(u)
+    f = f * f * (3 - 2 * f)
+    return vals[i0] * (1 - f) + vals[i1] * f
+
+
+def tapered_bar(c, p0, p1, w0, w1, ramp, stripes=5, hl=0.35, lo=0.15, hi=0.85, grit=0.15, rng=None):
+    """Cylinder along p0 -> p1 drawn as lateral slices with a dithered highlight."""
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    L = math.hypot(dx, dy)
+    nx, ny = -dy / L, dx / L
+    total = c.none()
+    for k in range(stripes):
+        u0 = -0.5 + k / stripes
+        u1 = u0 + 1.0 / stripes
+        quad = [(p0[0] + nx * u0 * w0, p0[1] + ny * u0 * w0), (p1[0] + nx * u0 * w1, p1[1] + ny * u0 * w1),
+                (p1[0] + nx * u1 * w1, p1[1] + ny * u1 * w1), (p0[0] + nx * u1 * w0, p0[1] + ny * u1 * w0)]
+        m = c.poly(quad)
+        um = (u0 + u1) / 2 + 0.5
+        t = lo + (1 - abs(um - hl) / max(hl, 1 - hl)) ** 0.8 * (hi - lo)
+        c.fill(m, ramp, t, grit=grit, rng=rng)
+        total |= m
+    return total
+
+
+def gen_fireball():
+    for frame in range(3):
+        rng = seed_for('fireball%d' % frame)
+        c = Canvas(48, 48)
+        cx = cy = 23.5
+        d = c.dist(cx, cy)
+        edge = 13 + angular_noise(c, cx, cy, 9, rng, frame * 0.13) * 9 + angular_noise(c, cx, cy, 19, rng) * 3
+        inside = d < edge
+        t = np.clip(1 - d / edge, 0, 1) ** 0.75 + (c.noise(4, rng, 2) - 0.5) * 0.3
+        c.fill(inside, RAMPS['fire'], np.clip(t, 0, 1))
+        c.outline((96, 0, 0))
+        c.glow(cx, cy, 24, (255, 110, 20), 0.3, 2.5)
+        save_sprite(c, 'sprites', 'projectiles', 'fireball', '%d.png' % frame)
+
+
+def flame(c, tail, direction, length, rng, width=8):
+    """Layered exhaust flame trailing from `tail` opposite to `direction`."""
+    dx, dy = direction
+    nx, ny = -dy, dx
+    for ramp_t, ln, wd in ((0.3, length, width), (0.6, length * 0.65, width * 0.6), (0.9, length * 0.35, width * 0.3)):
+        pts = [(tail[0] + nx * wd / 2, tail[1] + ny * wd / 2)]
+        for k in range(1, 5):
+            f = k / 5
+            jitter = (rng.random_sample() - 0.5) * wd * 0.6
+            pts.append((tail[0] - dx * ln * f + nx * (wd / 2 * (1 - f) + jitter), tail[1] - dy * ln * f + ny * (wd / 2 * (1 - f) + jitter)))
+        pts.append((tail[0] - dx * ln, tail[1] - dy * ln))
+        for k in range(4, 0, -1):
+            f = k / 5
+            jitter = (rng.random_sample() - 0.5) * wd * 0.6
+            pts.append((tail[0] - dx * ln * f - nx * (wd / 2 * (1 - f) + jitter), tail[1] - dy * ln * f - ny * (wd / 2 * (1 - f) + jitter)))
+        pts.append((tail[0] - nx * wd / 2, tail[1] - ny * wd / 2))
+        c.fill(c.poly(pts), RAMPS['fire'], ramp_t + (c.noise(3, rng, 2) - 0.5) * 0.25)
+
+
+def gen_rocket_projectile():
+    for frame in range(2):
+        rng = seed_for('rocketp%d' % frame)
+        c = Canvas(48, 48)
+        p0, p1 = (16.0, 33.0), (31.0, 15.0)                          # tail -> nose
+        L = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+        d = ((p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L)
+        n = (-d[1], d[0])
+        flame(c, (p0[0] - d[0] * 2, p0[1] - d[1] * 2), d, 11 + frame * 5, rng, 9 + frame * 2)
+        for sgn in (-1, 1):                                          # fins
+            fin = c.poly([(p0[0] + n[0] * sgn * 3, p0[1] + n[1] * sgn * 3), (p0[0] + n[0] * sgn * 9 - d[0] * 3, p0[1] + n[1] * sgn * 9 - d[1] * 3),
+                          (p0[0] + n[0] * sgn * 4 + d[0] * 7, p0[1] + n[1] * sgn * 4 + d[1] * 7)])
+            c.fill(fin, RAMPS['gunmetal'], 0.35 + (sgn + 1) * 0.15)
+        tapered_bar(c, p0, p1, 10, 9, RAMPS['steel'], 5, 0.35, 0.15, 0.85, 0.2, rng)
+        cone = c.poly([(p1[0] + n[0] * 4.5, p1[1] + n[1] * 4.5), (p1[0] + d[0] * 9, p1[1] + d[1] * 9), (p1[0] - n[0] * 4.5, p1[1] - n[1] * 4.5)])
+        c.fill(cone, RAMPS['red'], 0.3 + c.cyl(p1[0] - 5, p1[0] + 5, 0.35) * 0.5)
+        c.tint(c.line(p1, (p1[0] - d[0] * 2, p1[1] - d[1] * 2), 10) & ~cone, (0, 0, 0), 0.4)
+        c.outline()
+        c.grunge(rng, 0.08, 2)
+        save_sprite(c, 'sprites', 'projectiles', 'rocket', '%d.png' % frame)
+
+
+def gen_explosion():
+    for frame in range(6):
+        rng = seed_for('explosion%d' % frame)
+        c = Canvas(128, 128)
+        cx = cy = 63.5
+        d = c.dist(cx, cy)
+        if frame == 0:
+            spikes = angular_noise(c, cx, cy, 14, rng)
+            edge = 12 + spikes ** 1.5 * 22
+            inside = d < edge
+            t = np.clip(1 - d / edge, 0, 1) ** 0.6 + 0.3
+            c.fill(inside, RAMPS['fire'], np.clip(t, 0, 1))
+            c.outline((150, 30, 0))
+            c.glow(cx, cy, 34, (255, 200, 80), 0.5, 2)
+        elif frame <= 3:
+            R = (36, 50, 58)[frame - 1]
+            n = fbm(128, 128, 22, 4, 0.55, rng, False, False)
+            field = (1 - d / R) + (n - 0.5) * 0.7 + angular_noise(c, cx, cy, 12, rng) * 0.2
+            inside = field > 0.12
+            t = np.clip(field * (1.3 - frame * 0.15), 0, 1)
+            c.fill(inside, RAMPS['explode'], t, grit=0.2, rng=rng)
+            # smoky, semi transparent rim
+            rimf = np.clip((0.3 - field) / 0.18, 0, 1)
+            c.alpha[inside] = 1 - rimf[inside] * 0.5
+            c.outline((30, 14, 10), thresh=0.4)
+            c.glow(cx, cy, R + 24, (255, 120, 30), 0.35 - frame * 0.06, 2.5)
+        else:
+            R = (60, 63)[frame - 4]
+            n = fbm(128, 128, 20, 4, 0.55, rng, False, False)
+            field = (1 - d / R) + (n - 0.5) * 1.1
+            inside = field > 0.32
+            t = np.clip(0.15 + field * 0.9 + (n - 0.5) * 0.3, 0, 1)
+            c.fill(inside, RAMPS['smoke'], t, grit=0.25, rng=rng)
+            fade_a = (0.8, 0.5)[frame - 4]
+            c.alpha[inside] = fade_a * np.clip((field[inside] - 0.32) / 0.25 + 0.4, 0.3, 1)
+            c.outline((22, 20, 20), thresh=0.35)
+        save_sprite(c, 'sprites', 'projectiles', 'explosion', '%d.png' % frame)
+
+
+def gen_blood():
+    for frame in range(3):
+        rng = seed_for('blood%d' % frame)
+        c = Canvas(32, 32)
+        spread = 4 + frame * 3
+        drops = []
+        if frame == 0:
+            drops.append((16, 16, 5))
+        for _ in range(9):
+            drops.append((16 + rng.normal(0, spread), 16 + rng.normal(0, spread) + frame * 2, rng.randint(1, 4 - min(frame, 2))))
+        for x, y, r in drops:
+            m = c.circle(x, y, r)
+            c.fill(m, RAMPS['blood'], 0.35 + c.sphere(x, y, r + 0.5) * 0.5, grit=0.2, rng=rng)
+        c.outline((30, 2, 2))
+        c.alpha[c.alpha > 0] *= (1.0, 0.8, 0.55)[frame]
+        save_sprite(c, 'sprites', 'projectiles', 'blood', '%d.png' % frame)
+
+
+def gen_puff():
+    for frame in range(3):
+        rng = seed_for('puff%d' % frame)
+        c = Canvas(32, 32)
+        spread = 3 + frame * 2
+        for _ in range(7):
+            x, y, r = 16 + rng.normal(0, spread), 16 + rng.normal(0, spread) - frame * 2, rng.randint(3, 6) + frame
+            m = c.circle(x, y, r)
+            c.fill(m, RAMPS['smoke'], 0.45 + c.sphere(x, y, r + 1, (-0.4, -0.5)) * 0.5, grit=0.25, rng=rng)
+        c.outline((50, 48, 48))
+        c.alpha[c.alpha > 0] *= (0.9, 0.7, 0.45)[frame]
+        save_sprite(c, 'sprites', 'projectiles', 'puff', '%d.png' % frame)
+
+
+def gen_projectiles():
+    gen_fireball()
+    gen_rocket_projectile()
+    gen_explosion()
+    gen_blood()
+    gen_puff()
+
+
+# ---------------------------------------------------------------------------
+# 3d. sprites - first-person weapons (194x210 art, upscaled 5x -> 970x1050)
+# ---------------------------------------------------------------------------
+WPN_W, WPN_H = 194, 210
+
+
+def draw_hand(c, gx, gy, rng, left=False):
+    """Gloved fist seen from behind, closed around a grip whose top is (gx, gy).
+
+    Drawn as a right hand (fingers curl to the left of the grip, thumb wraps
+    over them) on a scratch canvas and mirrored for a left hand.  The sleeve
+    runs off the bottom edge like the shotgun sprite.
+    """
+    t = Canvas(c.w, c.h)
+    if left:
+        gx = c.w - 1 - gx
+    # sleeve + green cuff (drawn first, the fist sits on top)
+    arm = t.poly([(gx - 10, gy + 34), (gx + 40, gy + 34), (gx + 60, c.h + 2), (gx - 18, c.h + 2)])
+    t.fill(arm, RAMPS['olive'], 0.25 + t.cyl(gx - 14, gx + 50, 0.35) * 0.45, grit=0.3, rng=rng)
+    cuff = arm & (t.yy >= gy + 38) & (t.yy < gy + 54)
+    t.fill(cuff, RAMPS['sleeve'], 0.35 + t.cyl(gx - 14, gx + 50, 0.35) * 0.5, grit=0.3, rng=rng)
+    t.tint(arm & (t.yy == gy + 54), (0, 0, 0), 0.5)
+    t.tint(arm & (t.yy == gy + 38), (0, 0, 0), 0.4)
+    # back of the hand with a knuckle ridge along the top
+    palm = t.rrect(gx - 4, gy + 4, 42, 38, 10)
+    for i in range(4):
+        palm |= t.circle(gx + 3 + i * 10, gy + 8, 6)
+    t.fill(palm, RAMPS['glove'], 0.15 + t.sphere(gx + 17, gy + 22, 27, (-0.45, -0.5)) * 0.8, grit=0.25, rng=rng)
+    for i in range(4):                                               # knuckle highlights / valleys
+        t.tint(t.circle(gx + 3 + i * 10, gy + 7, 2), (255, 255, 255), 0.2)
+        t.tint(t.rect(gx + 8 + i * 10, gy + 4, 1, 8) & palm, (0, 0, 0), 0.3)
+    # four curled fingers wrapping the far side of the grip
+    widths = (32, 33, 31, 27)
+    for i, w in enumerate(widths):
+        fy = gy + 8 + i * 9
+        f = t.rrect(gx - 24, fy, w, 10, 4)
+        t.fill(f, RAMPS['glove'], 0.2 + t.cyl_v(fy, fy + 10, 0.3) * 0.55 + t.grad_h(gx - 24, gx + 8) * 0.2, grit=0.25, rng=rng)
+        t.tint(f & (t.yy == fy + 9), (0, 0, 0), 0.55)               # crease between fingers
+        t.tint(t.rect(gx - 18, fy + 2, 6, 2) & f, (255, 255, 255), 0.18)
+        t.tint(t.rect(gx - 24, fy, 4, 10) & f, (0, 0, 0), 0.25)     # finger tips in shadow
+    # thumb wrapping diagonally over the index finger
+    thumb = tapered_bar(t, (gx + 22, gy + 6), (gx - 12, gy + 16), 13, 9, RAMPS['glove'], 4, 0.35, 0.25, 0.85, 0.25, rng)
+    tip = t.circle(gx - 12, gy + 16, 4)
+    t.fill(tip, RAMPS['glove'], 0.4 + t.sphere(gx - 12, gy + 16, 5) * 0.4, grit=0.2, rng=rng)
+    thumb |= tip
+    t.tint(dilate(thumb) & ~thumb & (t.alpha > 0), (0, 0, 0), 0.5)
+    if left:
+        t = t.flipped()
+    c.blit(t, 0, 0)
+
+
+def muzzle_flash(c, cx, cy, r, rng, spikes=11):
+    """Layered star burst: orange -> yellow -> white core."""
+    for scale, level, a in ((1.0, 0.55, 0.85), (0.66, 0.8, 1.0), (0.36, 1.0, 1.0)):
+        pts = []
+        for k in range(spikes * 2):
+            ang = k * math.pi / spikes + rng.uniform(-0.12, 0.12)
+            rr = r * scale * (rng.uniform(0.9, 1.1) if k % 2 == 0 else rng.uniform(0.45, 0.65))
+            pts.append((cx + math.cos(ang) * rr, cy + math.sin(ang) * rr))
+        m = c.poly(pts)
+        c.fill(m, RAMPS['fire'], level + (c.noise(5, rng, 2) - 0.5) * 0.25, alpha=a)
+    c.glow(cx, cy, r * 1.5, (255, 160, 40), 0.45, 2.2)
+
+
+def smoke_puffs(c, cx, cy, spread, n, rng, alpha=0.6, size=(6, 12)):
+    for _ in range(n):
+        x, y = cx + rng.normal(0, spread), cy + rng.normal(0, spread * 0.6)
+        r = rng.randint(size[0], size[1])
+        m = c.circle(x, y, r)
+        c.fill(m, RAMPS['smoke'], 0.5 + c.sphere(x, y, r + 1, (-0.4, -0.5)) * 0.4, grit=0.25, rng=rng, alpha=alpha)
+
+
+def save_weapon(c, rng, *rel):
+    c.grunge(rng, 0.09, 2)
+    big = pg.transform.scale(c.surface(), (WPN_W * 5, WPN_H * 5))
+    save_surface(big, *rel)
+
+
+def draw_pistol(rng, oy=0, slide_back=0, flash=False):
+    c = Canvas(WPN_W, WPN_H)
+    gx = 111
+    # grip with a brown checkered panel
+    grip = c.rrect(gx - 12, 126 + oy, 24, 64, 3)
+    c.fill(grip, RAMPS['gunmetal'], 0.2 + c.cyl(gx - 12, gx + 12, 0.35) * 0.4, grit=0.2, rng=rng)
+    panel = c.rrect(gx - 8, 138 + oy, 16, 44, 2)
+    checker = ((c.xx + c.yy) % 2 == 0)
+    c.fill(panel & checker, RAMPS['leather'], 0.55)
+    c.fill(panel & ~checker, RAMPS['leather'], 0.3)
+    draw_hand(c, gx, 136 + oy, rng)
+    # frame and trigger guard above the fingers
+    frame = c.rect(gx - 14, 116 + oy, 28, 16)
+    c.fill(frame, RAMPS['gunmetal'], 0.18 + c.cyl(gx - 14, gx + 14, 0.35) * 0.3, grit=0.2, rng=rng)
+    # barrel (only visible when the slide is back)
+    sb = slide_back
+    top, bot = 72 + oy + sb, 126 + oy + sb
+    if slide_back:                                                                   # exposed barrel
+        barrel = c.rect(gx - 7, top - 14, 14, 16)
+        c.fill(barrel, RAMPS['steel'], 0.3 + c.cyl(gx - 7, gx + 7, 0.35) * 0.55, grit=0.2, rng=rng)
+        c.fill(c.ellipse(gx - 7, top - 17, 14, 7), RAMPS['dark'], 0.3)
+    slide = c.poly([(gx - 15, top), (gx + 15, top), (gx + 23, bot), (gx - 23, bot)])
+    c.fill(slide, RAMPS['gunmetal'], 0.12 + c.grad_h(gx - 23, gx + 23) * 0.15, grit=0.15, rng=rng)
+    face = c.poly([(gx - 10, top + 2), (gx + 10, top + 2), (gx + 17, bot), (gx - 17, bot)])
+    c.fill(face, RAMPS['gunmetal'], 0.3 + (1 - c.grad_h(gx - 17, gx + 17)) * 0.4 + c.grad_v(top, bot) * 0.1, grit=0.2, rng=rng)
+    c.tint(c.rect(gx - 1, top + 4, 2, bot - top - 12) & face, (0, 0, 0), 0.35)      # sight groove
+    port = c.rect(gx + 4, top + 16, 9, 18) & face
+    c.fill(port, RAMPS['dark'], 0.35)
+    for k in range(0, 12, 2):                                                        # rear serrations
+        c.tint(c.rect(gx - 22 + k, bot - 16, 1, 12) & slide, (255, 255, 255), 0.18)
+        c.tint(c.rect(gx + 12 + k, bot - 16, 1, 12) & slide, (255, 255, 255), 0.18)
+    # front sight, rear sight with a notch, hammer
+    c.fill(c.rect(gx - 2, top - 4, 4, 9), RAMPS['gunmetal'], 0.4)
+    c.paint(c.rect(gx - 1, top - 3, 2, 2), (240, 240, 240))
+    rear = c.rect(gx - 20, bot - 7, 40, 10) & ~c.rect(gx - 4, bot - 7, 8, 6)
+    c.fill(rear, RAMPS['gunmetal'], 0.28 + c.grad_v(bot - 7, bot + 3) * 0.2)
+    c.paint(c.rect(gx - 12, bot - 5, 2, 2) | c.rect(gx + 10, bot - 5, 2, 2), (240, 240, 240))
+    hammer = c.ellipse(gx - 6, bot + 1, 12, 10)
+    c.fill(hammer, RAMPS['gunmetal'], 0.25 + c.sphere(gx, bot + 6, 6) * 0.4)
+    c.outline()
+    if flash:
+        muzzle_flash(c, gx, top - 22, 40, rng)
+    return c
+
+
+def gen_pistol():
+    rng = seed_for('pistol0')
+    save_weapon(draw_pistol(rng, 0, 0, False), rng, 'sprites', 'weapon', 'pistol', '0.png')
+    rng = seed_for('pistol1')
+    save_weapon(draw_pistol(rng, -10, 0, True), rng, 'sprites', 'weapon', 'pistol', '1.png')
+    rng = seed_for('pistol2')
+    save_weapon(draw_pistol(rng, -18, 9, False), rng, 'sprites', 'weapon', 'pistol', '2.png')
+
+
+def draw_chaingun(rng, phase_deg=0, flash_r=0):
+    c = Canvas(WPN_W, WPN_H)
+    cx = 97
+    near_y, far_y, r_near, r_far, ry = 122, 62, 27, 19, 0.45
+    barrels = []
+    for i in range(6):
+        a = math.radians(phase_deg + i * 60)
+        barrels.append((math.sin(a), a))
+    for _, a in sorted(barrels):                                     # back to front
+        near = (cx + math.cos(a) * r_near, near_y + math.sin(a) * r_near * ry)
+        far = (cx + math.cos(a) * r_far, far_y + math.sin(a) * r_far * ry)
+        tapered_bar(c, near, far, 14, 10, RAMPS['gunmetal'], 5, 0.35, 0.12, 0.8, 0.2, rng)
+    # solid muzzle plate at the far end with six bores
+    plate = c.ellipse(cx - 29, far_y - 13, 58, 26)
+    c.fill(plate, RAMPS['steel'], 0.2 + c.cyl(cx - 29, cx + 29, 0.35) * 0.5, grit=0.2, rng=rng)
+    c.tint(c.ellipse(cx - 25, far_y - 11, 50, 22) & plate, (0, 0, 0), 0.25)
+    for _, a in barrels:
+        bx, by = cx + math.cos(a) * r_far * 0.75, far_y + math.sin(a) * r_far * ry * 0.75
+        bore = c.ellipse(bx - 4, by - 3, 9, 7)
+        c.fill(bore, RAMPS['dark'], 0.15)
+        c.tint(dilate(bore) & ~bore & plate, (150, 156, 166), 0.4)
+    c.fill(c.circle(cx, far_y, 4), RAMPS['gunmetal'], 0.5)
+    # rotating drum housing (near end) + receiver body
+    drum = c.ellipse(cx - 36, near_y - 12, 72, 32)
+    c.fill(drum, RAMPS['steel'], 0.12 + c.cyl(cx - 36, cx + 36, 0.35) * 0.55, grit=0.2, rng=rng)
+    c.tint(c.ellipse(cx - 30, near_y - 9, 60, 26) & drum, (0, 0, 0), 0.3)
+    c.fill(c.circle(cx, near_y + 4, 6), RAMPS['gunmetal'], 0.5)
+    body = c.rrect(50, near_y + 8, 94, 60, 5)
+    c.fill(body, RAMPS['gunmetal'], 0.18 + c.cyl(50, 144, 0.35) * 0.35, grit=0.2, rng=rng)
+    c.fill(c.rect(54, near_y + 8, 86, 12) & body, RAMPS['gunmetal'], 0.5 + c.cyl(50, 144, 0.35) * 0.3, grit=0.2, rng=rng)
+    c.tint(c.rect(54, near_y + 20, 86, 1), (0, 0, 0), 0.6)
+    for k in range(3):                                               # cooling slots
+        c.fill(c.rect(70 + k * 20, near_y + 30, 12, 4), RAMPS['dark'], 0.25)
+    # feed cover + ammo belt on the left
+    cover = c.rrect(28, near_y + 18, 30, 30, 3)
+    c.fill(cover, RAMPS['steel'], 0.25 + c.cyl(28, 58, 0.35) * 0.4, grit=0.2, rng=rng)
+    for k in range(5):
+        bx = 2 + k * 6
+        by = near_y + 22 + int(math.sin(k * 0.9) * 3)
+        cart = c.rrect(bx, by, 6, 20, 2)
+        c.fill(cart, RAMPS['brass'], 0.35 + c.cyl(bx, bx + 6, 0.35) * 0.5)
+        c.fill(c.rect(bx, by, 6, 5), RAMPS['copper'], 0.5)
+        c.tint(c.rect(bx, by + 9, 6, 2), (0, 0, 0), 0.5)             # belt link
+    # grips and both hands
+    for gx in (64, 136):
+        g = c.rrect(gx - 8, near_y + 56, 16, 40, 3)
+        c.fill(g, RAMPS['gunmetal'], 0.2 + c.cyl(gx - 8, gx + 8, 0.35) * 0.35, grit=0.2, rng=rng)
+    draw_hand(c, 64, near_y + 62, rng, left=True)
+    draw_hand(c, 136, near_y + 62, rng, left=False)
+    c.outline()
+    if flash_r:
+        muzzle_flash(c, cx, far_y - 24, flash_r, rng)
+    return c
+
+
+def gen_chaingun():
+    rng = seed_for('chaingun0')
+    save_weapon(draw_chaingun(rng, 0, 0), rng, 'sprites', 'weapon', 'chaingun', '0.png')
+    rng = seed_for('chaingun1')
+    save_weapon(draw_chaingun(rng, 20, 30), rng, 'sprites', 'weapon', 'chaingun', '1.png')
+    rng = seed_for('chaingun2')
+    save_weapon(draw_chaingun(rng, 40, 42), rng, 'sprites', 'weapon', 'chaingun', '2.png')
+
+
+def draw_rocket_launcher(rng, oy=0, flash=False, wisp=False):
+    c = Canvas(WPN_W, WPN_H)
+    p0 = (154.0, 214.0 + oy)                                         # near end (on the shoulder)
+    p1 = (108.0, 62.0 + oy)                                          # muzzle
+    L = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    d = ((p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L)
+    n = (-d[1], d[0])
+
+    def axis(s, w0=62, w1=40):
+        return (p0[0] + (p1[0] - p0[0]) * s, p0[1] + (p1[1] - p0[1]) * s), w0 + (w1 - w0) * s
+
+    tapered_bar(c, p0, p1, 62, 40, RAMPS['steel'], 7, 0.38, 0.1, 0.8, 0.2, rng)
+    # red band, sight rail, rear sling loop
+    (pa, wa), (pb, wb) = axis(0.62), axis(0.70)
+    tapered_bar(c, pa, pb, wa + 2, wb + 2, RAMPS['red'], 7, 0.38, 0.2, 0.85, 0.2, rng)
+    (pa, wa), (pb, wb) = axis(0.40), axis(0.43)
+    tapered_bar(c, pa, pb, wa + 2, wb + 2, RAMPS['gunmetal'], 7, 0.38, 0.15, 0.6, 0.2, rng)
+    sp, sw = axis(0.55)
+    sight = c.rect(sp[0] + n[0] * (-sw / 2) - 4, sp[1] + n[1] * (-sw / 2) - 8, 8, 10)
+    c.fill(sight, RAMPS['gunmetal'], 0.35)
+    c.paint(c.rect(sp[0] + n[0] * (-sw / 2) - 1, sp[1] + n[1] * (-sw / 2) - 6, 2, 2), (240, 240, 240))
+    # muzzle: ring + dark bore
+    ring = c.ellipse(p1[0] - 21, p1[1] - 9, 42, 18)
+    c.fill(ring, RAMPS['gunmetal'], 0.25 + c.cyl(p1[0] - 21, p1[1] + 21, 0.35) * 0.4, grit=0.2, rng=rng)
+    bore = c.ellipse(p1[0] - 15, p1[1] - 6, 30, 12)
+    c.fill(bore, RAMPS['dark'], 0.12 + c.grad_v(p1[1] - 6, p1[1] + 6) * 0.25)
+    # trigger grip under the tube + right hand
+    gx, gy = 112, 172
+    grip = c.rrect(gx - 9, gy - 10, 18, 46, 3)
+    c.fill(grip, RAMPS['gunmetal'], 0.2 + c.cyl(gx - 9, gx + 9, 0.35) * 0.35, grit=0.2, rng=rng)
+    draw_hand(c, gx, gy, rng)
+    c.outline()
+    if flash:
+        muzzle_flash(c, p1[0], p1[1] - 16, 44, rng)
+        smoke_puffs(c, p1[0], p1[1] - 30, 22, 8, rng, 0.55, (7, 14))
+    if wisp:
+        smoke_puffs(c, p1[0], p1[1] - 22, 10, 4, rng, 0.45, (4, 8))
+    return c
+
+
+def gen_rocket_launcher():
+    rng = seed_for('rl0')
+    save_weapon(draw_rocket_launcher(rng, 0, False, False), rng, 'sprites', 'weapon', 'rocket_launcher', '0.png')
+    rng = seed_for('rl1')
+    save_weapon(draw_rocket_launcher(rng, -4, True, False), rng, 'sprites', 'weapon', 'rocket_launcher', '1.png')
+    rng = seed_for('rl2')
+    save_weapon(draw_rocket_launcher(rng, -16, False, True), rng, 'sprites', 'weapon', 'rocket_launcher', '2.png')
+
+
+def gen_weapons():
+    gen_pistol()
+    gen_chaingun()
+    gen_rocket_launcher()
+
+
+def gen_sprites():
+    gen_pickups()
+    gen_decorations()
+    gen_projectiles()
+    gen_weapons()
+
+
+# ---------------------------------------------------------------------------
+# 4. sound synthesis helpers
+# ---------------------------------------------------------------------------
+def samples(seconds):
+    return int(round(seconds * SR))
+
+
+def tline(seconds):
+    return np.arange(samples(seconds)) / SR
+
+
+def osc(kind, freq, n=None, seconds=None, duty=0.5, phase=0.0):
+    """Retro oscillator; freq may be a scalar or a per-sample array (sweeps)."""
+    if n is None:
+        n = samples(seconds)
+    f = np.broadcast_to(np.asarray(freq, np.float64), (n,))
+    ph = (np.cumsum(f) / SR + phase) % 1.0
+    if kind == 'sine':
+        return np.sin(2 * np.pi * ph)
+    if kind == 'square':
+        return np.where(ph < duty, 1.0, -1.0)
+    if kind == 'saw':
+        return 2 * ph - 1
+    if kind == 'tri':
+        return 4 * np.abs(ph - 0.5) - 1
+    raise ValueError(kind)
+
+
+def white(n, rng):
+    return rng.uniform(-1, 1, n)
+
+
+def lowpass(x, cutoff):
+    """One-pole lowpass.  cutoff in Hz, scalar or per-sample array (sweeps).
+
+    Vectorised in blocks: inside a block the coefficient is constant and the
+    recurrence y[n] = y[n-1] + a (x[n] - y[n-1]) has the closed form used below.
+    """
+    x = np.asarray(x, np.float64)
+    n = len(x)
+    cut = np.broadcast_to(np.asarray(cutoff, np.float64), (n,))
+    coef = 1.0 - np.exp(-2 * np.pi * np.clip(cut, 1, SR * 0.45) / SR)
+    y = np.empty(n)
+    state = 0.0
+    B = 64
+    k = np.arange(B)
+    for s in range(0, n, B):
+        a = float(np.clip(coef[s:s + B].mean(), 1e-5, 0.95))
+        xs = x[s:s + B]
+        m = len(xs)
+        kk = k[:m]
+        r = 1.0 - a
+        decay = r ** (kk + 1)
+        ys = decay * state + (r ** kk) * np.cumsum(a * xs * (r ** (-kk)))
+        y[s:s + m] = ys
+        state = ys[-1]
+    return y
+
+
+def highpass(x, cutoff):
+    return np.asarray(x, np.float64) - lowpass(x, cutoff)
+
+
+def brown(n, rng):
+    b = np.cumsum(white(n, rng))
+    b = highpass(b, 20)
+    return normalize(b, 1.0)
+
+
+def env_exp(n, tau):
+    return np.exp(-np.arange(n) / (tau * SR))
+
+
+def adsr(n, a, d, s, r):
+    """Linear attack/decay/sustain/release envelope (times in seconds)."""
+    t = np.arange(n) / SR
+    total = n / SR
+    env = np.full(n, float(s))
+    att = t < a
+    env[att] = t[att] / max(a, 1e-6)
+    dec = (t >= a) & (t < a + d)
+    env[dec] = 1 - (1 - s) * (t[dec] - a) / max(d, 1e-6)
+    rel = t > total - r
+    env[rel] *= np.clip((total - t[rel]) / max(r, 1e-6), 0, 1)
+    return env
+
+
+def bitcrush(x, bits=8, hold=1):
+    q = 2 ** (bits - 1)
+    y = np.round(np.asarray(x) * q) / q
+    if hold > 1:
+        y = np.repeat(y[::hold], hold)[:len(x)]
+    return y
+
+
+def distort(x, drive=4.0):
+    return np.tanh(np.asarray(x) * drive) / math.tanh(drive)
+
+
+def normalize(x, peak=0.8):
+    x = np.nan_to_num(np.asarray(x, np.float64))
+    m = np.max(np.abs(x)) if len(x) else 0
+    return x * (peak / m) if m > 0 else x
+
+
+def fade(x, ms=2.0):
+    k = min(len(x) // 2, samples(ms / 1000.0))
+    if k > 0:
+        ramp = np.linspace(0, 1, k)
+        if x.ndim == 2:
+            ramp = ramp[:, None]
+        x[:k] *= ramp
+        x[-k:] *= ramp[::-1]
+    return x
+
+
+def place(buf, x, at, gain=1.0):
+    """Mix x into buf starting at `at` seconds (clipped to the buffer)."""
+    i = samples(at)
+    n = min(len(x), len(buf) - i)
+    if n > 0 and i >= 0:
+        buf[i:i + n] += x[:n] * gain
+    return buf
+
+
+def echo(x, delay, feedback=0.4, taps=3):
+    out = np.array(x, np.float64)
+    for k in range(1, taps + 1):
+        place(out, x, delay * k, feedback ** k)
+    return out
+
+
+def fit(x, seconds):
+    n = samples(seconds)
+    if len(x) >= n:
+        return x[:n]
+    return np.concatenate([x, np.zeros(n - len(x))])
+
+
+def write_wav(rel, data):
+    """16-bit PCM WAV at SR; data shape (n,) mono or (n, 2) stereo."""
+    path = rpath(*rel)
+    data = np.asarray(data, np.float64)
+    channels = 1 if data.ndim == 1 else data.shape[1]
+    pcm = (np.clip(data, -1, 1) * 32767).astype('<i2')
+    with wave.open(path, 'wb') as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(np.ascontiguousarray(pcm).tobytes())
+    GENERATED_AUDIO.append(path)
+    return path
+
+
+# ---------------------------------------------------------------------------
+# 4b. sound effects (mono)
+# ---------------------------------------------------------------------------
+def sfx_pistol(rng):
+    n = samples(0.25)
+    crack = lowpass(white(n, rng), np.linspace(8000, 1200, n)) * env_exp(n, 0.04)
+    thump = osc('sine', np.linspace(200, 55, n), n) * env_exp(n, 0.07)
+    snap = white(n, rng) * env_exp(n, 0.003)
+    return bitcrush(crack + thump * 0.8 + snap, 8)
+
+
+def sfx_chaingun(rng):
+    n = samples(0.12)
+    crack = highpass(lowpass(white(n, rng), 5000), 300) * env_exp(n, 0.02)
+    thump = osc('square', np.linspace(160, 70, n), n) * env_exp(n, 0.03) * 0.5
+    return bitcrush(crack + thump + white(n, rng) * env_exp(n, 0.002), 8)
+
+
+def sfx_rocket_launch(rng):
+    n = samples(0.6)
+    t = tline(0.6)
+    cut = 400 + 2800 * np.sin(np.pi * np.clip(t / 0.5, 0, 1))
+    whoosh = lowpass(white(n, rng), cut) * np.sin(np.pi * np.clip(t / 0.6, 0, 1)) ** 0.6
+    thump = osc('sine', np.linspace(120, 40, n), n) * env_exp(n, 0.12)
+    burst = lowpass(white(n, rng), 1500) * env_exp(n, 0.05)
+    return whoosh + thump + burst * 0.8
+
+
+def sfx_explosion(rng, pitch=1.0, clank=False):
+    n = samples(1.0)
+    boom = lowpass(brown(n, rng), np.linspace(2500, 150, n) * pitch) * env_exp(n, 0.32)
+    sub = osc('sine', np.linspace(70, 35, n) * pitch, n) * env_exp(n, 0.25)
+    crack = lowpass(white(n, rng), 6000) * env_exp(n, 0.02)
+    x = boom * 1.2 + sub * 0.8 + crack * 0.7
+    if clank:
+        for f, dl, tau in ((1240, 0.05, 0.12), (1730, 0.07, 0.10), (2460, 0.09, 0.08), (880, 0.12, 0.15)):
+            m = samples(0.4)
+            place(x, osc('sine', f * pitch, m) * env_exp(m, tau), dl, 0.35)
+    return bitcrush(x, 8)
+
+
+def sfx_barrel_explode(rng):
+    return sfx_explosion(rng, 1.5, True)
+
+
+def sfx_door(rng, opening):
+    n = samples(0.6)
+    cut = np.linspace(600, 3800, n) if opening else np.linspace(3800, 600, n)
+    hiss = highpass(lowpass(white(n, rng), cut), 200) * adsr(n, 0.05, 0.1, 0.7, 0.15)
+    mf = np.linspace(50, 110, n) if opening else np.linspace(110, 50, n)
+    motor = lowpass(osc('square', mf, n, duty=0.3), 400) * adsr(n, 0.05, 0.1, 0.8, 0.1) * 0.15
+    x = hiss * 0.8 + motor
+    if not opening:
+        m = samples(0.15)
+        clunk = osc('sine', np.linspace(110, 60, m), m) * env_exp(m, 0.04) + lowpass(white(m, rng), 900) * env_exp(m, 0.02)
+        place(x, clunk, 0.46, 1.2)
+    return x
+
+
+def sfx_door_open(rng):
+    return sfx_door(rng, True)
+
+
+def sfx_door_close(rng):
+    return sfx_door(rng, False)
+
+
+def sfx_door_locked(rng):
+    x = np.zeros(samples(0.3))
+    for start in (0.0, 0.15):
+        m = samples(0.12)
+        buzz = osc('square', 110, m) * (osc('square', 30, m) * 0.5 + 0.5)
+        place(x, lowpass(buzz, 1800) * adsr(m, 0.005, 0.02, 0.8, 0.03), start)
+    return bitcrush(x, 8)
+
+
+def sfx_pickup_item(rng):
+    n = samples(0.15)
+    f = np.where(tline(0.15) < 0.06, 880.0, 1320.0)
+    return bitcrush(osc('square', f, n) * adsr(n, 0.003, 0.05, 0.5, 0.05), 8)
+
+
+def sfx_pickup_weapon(rng):
+    x = np.zeros(samples(0.5))
+    for i, f in enumerate((523.25, 659.25, 783.99)):
+        m = samples(0.16 if i < 2 else 0.22)
+        vib = 1 + 0.004 * np.sin(2 * np.pi * 6 * np.arange(m) / SR)
+        place(x, osc('square', f * vib, m, duty=0.25) * adsr(m, 0.005, 0.05, 0.6, 0.05), i * 0.14)
+    return bitcrush(x, 8)
+
+
+def sfx_pickup_key(rng):
+    x = np.zeros(samples(0.4))
+    for i, f in enumerate((660.0, 990.0)):
+        m = samples(0.2)
+        place(x, (osc('tri', f, m) + 0.3 * osc('sine', 2 * f, m)) * adsr(m, 0.005, 0.08, 0.5, 0.08), i * 0.18)
+    return x
+
+
+def sfx_powerup(rng):
+    n = samples(0.8)
+    t = tline(0.8)
+    f = 300 * 4.0 ** (t / 0.8)
+    trem = 0.75 + 0.25 * np.sin(2 * np.pi * 12 * t)
+    x = (osc('tri', f, n) + 0.5 * osc('sine', f * 1.5, n) + 0.3 * osc('sine', f * 2, n)) * trem
+    return echo(x * adsr(n, 0.05, 0.1, 0.8, 0.25), 0.09, 0.45, 3)
+
+
+def sfx_switch(rng):
+    x = np.zeros(samples(0.3))
+    k = samples(0.02)
+    place(x, white(k, rng) * env_exp(k, 0.004), 0.0)
+    m = samples(0.15)
+    clunk = osc('sine', np.linspace(140, 70, m), m) * env_exp(m, 0.04) + lowpass(white(m, rng), 1200) * env_exp(m, 0.03)
+    place(x, clunk, 0.1)
+    return bitcrush(x, 8)
+
+
+def sfx_secret_found(rng):
+    x = np.zeros(samples(0.6))
+    for i, f in enumerate((440.0, 523.25, 659.25, 830.61, 987.77, 1318.5)):
+        m = samples(0.16)
+        place(x, osc('tri', f, m) * adsr(m, 0.005, 0.06, 0.5, 0.08), i * 0.085, 0.9 - i * 0.05)
+    return echo(x, 0.12, 0.4, 3)
+
+
+def sfx_menu_move(rng):
+    n = samples(0.08)
+    return osc('tri', 1000, n) * env_exp(n, 0.012) + white(n, rng) * env_exp(n, 0.002) * 0.3
+
+
+def sfx_menu_select(rng):
+    n = samples(0.2)
+    f = np.where(tline(0.2) < 0.08, 700.0, 1050.0)
+    return bitcrush(osc('square', f, n) * adsr(n, 0.003, 0.06, 0.5, 0.06), 8)
+
+
+def sfx_menu_back(rng):
+    n = samples(0.2)
+    f = np.where(tline(0.2) < 0.08, 1000.0, 520.0)
+    return bitcrush(osc('square', f, n) * adsr(n, 0.003, 0.06, 0.5, 0.06), 8)
+
+
+def sfx_player_death(rng):
+    n = samples(1.2)
+    t = tline(1.2)
+    f = 220 * (65 / 220) ** (t / 1.2) * (1 + 0.03 * np.sin(2 * np.pi * 7 * t))
+    voice = osc('saw', f, n) + 0.5 * osc('square', f * 0.5, n, duty=0.3)
+    growl = lowpass(white(n, rng), 1200) * (0.5 + 0.5 * osc('square', f, n))
+    x = lowpass(voice * 0.7 + growl * 0.6, np.linspace(2500, 300, n)) * adsr(n, 0.02, 0.3, 0.7, 0.5)
+    return bitcrush(x, 8)
+
+
+def sfx_fireball(rng):
+    n = samples(0.4)
+    t = tline(0.4)
+    cut = 300 + 2400 * np.sin(np.pi * np.clip(t / 0.4, 0, 1)) ** 0.7
+    whoosh = lowpass(white(n, rng), cut) * adsr(n, 0.03, 0.1, 0.7, 0.15)
+    crackle = np.where(rng.random_sample(n) < 0.004, rng.uniform(-1, 1, n), 0.0)
+    crackle = lowpass(crackle, 3000) * adsr(n, 0.02, 0.1, 0.8, 0.15)
+    tone = osc('saw', np.linspace(90, 60, n), n) * env_exp(n, 0.15) * 0.3
+    return whoosh + crackle * 3 + tone
+
+
+def sfx_level_complete(rng):
+    x = np.zeros(samples(1.5))
+    for i, f in enumerate((523.25, 659.25, 783.99, 1046.5)):
+        m = samples(0.14)
+        place(x, osc('square', f, m, duty=0.25) * adsr(m, 0.005, 0.04, 0.7, 0.04), i * 0.12)
+    m = samples(1.0)
+    chord = sum(osc('square', f, m, duty=0.5 if k % 2 else 0.25) for k, f in enumerate((523.25, 659.25, 783.99, 1046.5))) / 4
+    place(x, chord * adsr(m, 0.01, 0.2, 0.6, 0.4), 0.48, 1.2)
+    return bitcrush(echo(x, 0.15, 0.3, 2), 8)
+
+
+def sfx_tally_tick(rng):
+    n = samples(0.05)
+    return osc('square', 2000, n) * env_exp(n, 0.008)
+
+
+def sfx_tally_done(rng):
+    n = samples(0.3)
+    return (osc('sine', 1320, n) + 0.4 * osc('sine', 2640, n)) * env_exp(n, 0.08)
+
+
+SOUND_SPECS = [
+    ('pistol', 0.25, sfx_pistol), ('chaingun', 0.12, sfx_chaingun),
+    ('rocket_launch', 0.6, sfx_rocket_launch), ('explosion', 1.0, sfx_explosion),
+    ('barrel_explode', 1.0, sfx_barrel_explode),
+    ('door_open', 0.6, sfx_door_open), ('door_close', 0.6, sfx_door_close), ('door_locked', 0.3, sfx_door_locked),
+    ('pickup_item', 0.15, sfx_pickup_item), ('pickup_weapon', 0.5, sfx_pickup_weapon),
+    ('pickup_key', 0.4, sfx_pickup_key), ('powerup', 0.8, sfx_powerup),
+    ('switch', 0.3, sfx_switch), ('secret_found', 0.6, sfx_secret_found),
+    ('menu_move', 0.08, sfx_menu_move), ('menu_select', 0.2, sfx_menu_select), ('menu_back', 0.2, sfx_menu_back),
+    ('player_death', 1.2, sfx_player_death), ('fireball', 0.4, sfx_fireball),
+    ('level_complete', 1.5, sfx_level_complete), ('tally_tick', 0.05, sfx_tally_tick), ('tally_done', 0.3, sfx_tally_done),
+]
+
+
+def gen_sounds():
+    for name, secs, fn in SOUND_SPECS:
+        rng = seed_for('sfx_' + name)
+        x = fit(fn(rng), secs)
+        x = fade(normalize(x, 0.8), 2.0)
+        write_wav(('sound', name + '.wav'), x)
+
+
+# ---------------------------------------------------------------------------
+# 5. music helpers (stereo, loop friendly)
+# ---------------------------------------------------------------------------
+def midi_hz(n):
+    return 440.0 * 2 ** ((n - 69) / 12.0)
+
+
+class Track:
+    """Stereo mix buffer with constant-power panning."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+        self.n = samples(seconds)
+        self.L = np.zeros(self.n)
+        self.R = np.zeros(self.n)
+
+    def add(self, x, at, pan=0.0, gain=1.0):
+        a = (pan + 1) / 2 * math.pi / 2
+        place(self.L, x, at, gain * math.cos(a))
+        place(self.R, x, at, gain * math.sin(a))
+
+    def finish(self, peak=0.7, fade_ms=15):
+        st = np.stack([self.L, self.R], axis=1)
+        st = st - st.mean(axis=0)                                    # remove DC offset
+        return fade(normalize(st, peak), fade_ms)
+
+
+def synth_pad(freq, seconds, rng, detune=(-7, 0, 7), cutoff=900, attack=1.0, release=1.0, kind='saw'):
+    n = samples(seconds)
+    x = np.zeros(n)
+    for cents in detune:
+        x += osc(kind, freq * 2 ** (cents / 1200.0), n, phase=rng.random_sample())
+    x = lowpass(x / len(detune), cutoff)
+    return x * adsr(n, attack, 0.0, 1.0, release)
+
+
+def synth_bass(freq, seconds, drive=3.0, cutoff=1200, decay=0.2):
+    n = samples(seconds)
+    x = osc('saw', freq, n) + 0.6 * osc('square', freq, n)
+    x = distort(lowpass(x, cutoff), drive)
+    return x * adsr(n, 0.005, decay, 0.6, 0.03)
+
+
+def synth_bell(freq, seconds, rng):
+    n = samples(seconds)
+    x = (osc('sine', freq, n) * env_exp(n, seconds * 0.35)
+         + 0.5 * osc('sine', freq * 2.76, n) * env_exp(n, seconds * 0.12)
+         + 0.3 * osc('sine', freq * 5.4, n) * env_exp(n, seconds * 0.06))
+    return x * adsr(n, 0.005, 0.0, 1.0, 0.05)
+
+
+def synth_lead(freq, seconds, duty=0.25, vib=0.006):
+    n = samples(seconds)
+    t = np.arange(n) / SR
+    f = freq * (1 + vib * np.sin(2 * np.pi * 5.5 * t))
+    return osc('square', f, n, duty=duty) * adsr(n, 0.01, 0.05, 0.75, 0.04)
+
+
+def synth_pluck(freq, seconds):
+    n = samples(seconds)
+    return osc('square', freq, n) * env_exp(n, 0.08) * adsr(n, 0.002, 0.0, 1.0, 0.01)
+
+
+def drum_kick(rng, seconds=0.35):
+    n = samples(seconds)
+    return osc('sine', 40 + 120 * env_exp(n, 0.04), n) * env_exp(n, 0.09) + lowpass(white(n, rng), 1200) * env_exp(n, 0.008) * 0.6
+
+
+def drum_snare(rng, seconds=0.25):
+    n = samples(seconds)
+    return highpass(white(n, rng), 800) * env_exp(n, 0.07) * 0.9 + osc('sine', 190, n) * env_exp(n, 0.04) * 0.7
+
+
+def drum_hat(rng, open_=False):
+    n = samples(0.25 if open_ else 0.06)
+    return highpass(white(n, rng), 6000) * env_exp(n, 0.08 if open_ else 0.012) * 0.6
+
+
+def drum_tom(rng, freq=90, seconds=0.4):
+    n = samples(seconds)
+    return osc('sine', freq * (1 + 0.6 * env_exp(n, 0.05)), n) * env_exp(n, 0.16) + lowpass(white(n, rng), 800) * env_exp(n, 0.01) * 0.4
+
+
+# ---------------------------------------------------------------------------
+# 5b. music loops
+# ---------------------------------------------------------------------------
+def music_menu():
+    """40 s dark ambient in D minor: detuned saw pad with a slow filter sweep."""
+    rng = seed_for('music_menu')
+    secs = 40.0
+    tr = Track(secs)
+    t = np.arange(tr.n) / SR
+    chords = [(38, 45, 50, 53), (46, 50, 53, 58), (43, 50, 55, 58), (45, 49, 52, 57)]   # Dm Bb Gm A
+    for i, ch in enumerate(chords):
+        for k, m in enumerate(ch):
+            x = synth_pad(midi_hz(m), 11.0, rng, (-6, 0, 6), 5000, 2.5, 3.0)
+            tr.add(x, i * 10.0 - (0.5 if i else 0.0), -0.5 + k * 0.33, 0.14)
+    sweep = 250 + 900 * (0.5 - 0.5 * np.cos(2 * np.pi * t / secs))       # one full cycle = seamless loop
+    tr.L = lowpass(tr.L, sweep)
+    tr.R = lowpass(tr.R, sweep)
+    sub = osc('sine', midi_hz(26), tr.n) * (0.6 + 0.4 * np.sin(2 * np.pi * t / 8.0))
+    tr.add(sub, 0, 0, 0.16)
+    tr.add(lowpass(brown(tr.n, rng), 60), 0, 0, 0.12)
+    for at, m in ((3.0, 74), (9.5, 69), (17.0, 77), (22.5, 72), (29.0, 65), (35.0, 74)):
+        b = echo(synth_bell(midi_hz(m), 4.0, rng), 0.37, 0.5, 4)
+        tr.add(lowpass(b, 2500), at, rng.uniform(-0.7, 0.7), 0.16)
+    return tr.finish(0.7, 30)
+
+
+def music_intermission():
+    """Tense minimal pulse at 100 BPM (8 bars = 19.2 s)."""
+    rng = seed_for('music_intermission')
+    beat = 60.0 / 100
+    bars = 8
+    secs = bars * 4 * beat
+    tr = Track(secs)
+    pattern = [33, 33, 33, 33, 33, 33, 34, 33, 33, 33, 33, 33, 33, 40, 33, 34]      # 8ths over 2 bars
+    for bar in range(bars):
+        for k in range(8):
+            m = pattern[(bar % 2) * 8 + k]
+            tr.add(synth_bass(midi_hz(m), beat * 0.45, 1.5, 500, 0.12), bar * 4 * beat + k * beat / 2, 0, 0.35)
+    ost = [81, 0, 76, 0, 0, 79, 0, 0, 86, 0, 0, 76, 0, 79, 0, 0]
+    buf = np.zeros(tr.n)
+    for bar in range(bars):
+        if bar % 4 == 3:
+            continue
+        for k in range(16):
+            if ost[k]:
+                place(buf, synth_pluck(midi_hz(ost[k]), beat), bar * 4 * beat + k * beat / 4)
+    buf = echo(buf, beat * 0.75, 0.4, 3)
+    tr.add(buf, 0, -0.35, 0.12)
+    tr.add(buf, 0.02, 0.35, 0.10)
+    for m, pan in ((69, -0.3), (76, 0.3)):
+        tr.add(synth_pad(midi_hz(m), secs, rng, (-4, 4), 1200, 3.0, 3.0, 'tri'), 0, pan, 0.07)
+    for bar in range(bars):
+        for k in range(8):
+            tr.add(drum_hat(rng), bar * 4 * beat + k * beat / 2, 0.3, 0.12 if k % 2 == 0 else 0.07)
+    return tr.finish(0.7, 20)
+
+
+def music_boss():
+    """Heavy 140 BPM loop in E minor (18 bars ~ 30.9 s): 16th-note chug + drums."""
+    rng = seed_for('music_boss')
+    beat = 60.0 / 140
+    bars = 18
+    secs = bars * 4 * beat
+    tr = Track(secs)
+    step = beat / 4
+    riff_a = [28, 28, 40, 28, 28, 28, 43, 28, 28, 28, 45, 28, 28, 28, 46, 45,
+              28, 28, 40, 28, 28, 28, 43, 28, 28, 28, 47, 46, 45, 43, 40, 28]
+    riff_b = [28, 28, 28, 40, 28, 28, 28, 43, 28, 28, 28, 46, 28, 28, 28, 47,
+              28, 28, 50, 28, 28, 28, 47, 28, 28, 28, 46, 45, 43, 40, 42, 28]
+    for bar in range(bars):
+        riff = riff_a if (bar % 8) < 4 or bar >= 16 else riff_b
+        base = bar * 4 * beat
+        for k in range(16):
+            m = riff[(bar % 2) * 16 + k]
+            accent = m != 28
+            x = synth_bass(midi_hz(m), step * (0.9 if accent else 0.6), 5.0, 1400 if accent else 900, 0.08)
+            tr.add(x, base + k * step, 0, 0.32 if accent else 0.26)
+        for k in (0, 0.75, 1.5, 2, 2.75, 3.5):
+            tr.add(drum_kick(rng), base + k * beat, 0, 0.5)
+        for k in (1, 3):
+            tr.add(drum_snare(rng), base + k * beat, 0.1, 0.4)
+        for k in range(8):
+            tr.add(drum_hat(rng, open_=(bar % 2 == 1 and k == 7)), base + k * beat / 2, 0.35, 0.16 if k % 2 == 0 else 0.1)
+        if bar >= 16:                                                            # 2-bar break with toms
+            for k in (2, 2.5, 3, 3.5):
+                tr.add(drum_tom(rng, 120 if bar == 16 else 80), base + k * beat, -0.3, 0.4)
+    for bar in range(0, bars, 4):                                                # power-chord stabs
+        n = samples(beat * 1.2)
+        for m in (40, 47, 52):
+            x = distort(lowpass(osc('saw', midi_hz(m), n) + osc('square', midi_hz(m) * 1.005, n), 2500), 4.0)
+            x *= adsr(n, 0.005, 0.2, 0.5, 0.15)
+            tr.add(x, bar * 4 * beat, -0.4, 0.13)
+            tr.add(x, bar * 4 * beat + 0.012, 0.4, 0.13)
+    return tr.finish(0.7, 15)
+
+
+def music_hell():
+    """Slow menacing 90 BPM loop (12 bars = 32 s): choir pad, tribal toms, stabs."""
+    rng = seed_for('music_hell')
+    beat = 60.0 / 90
+    bars = 12
+    secs = bars * 4 * beat
+    tr = Track(secs)
+    for m, pan in ((40, -0.6), (47, -0.2), (52, 0.2), (55, 0.6)):
+        x = synth_pad(midi_hz(m), secs, rng, (-9, -3, 3, 9), 700, 3.0, 3.0)
+        x = x + 0.5 * (lowpass(x, 1400) - lowpass(x, 700))                       # vowel-ish formant bump
+        t = np.arange(len(x)) / SR
+        x *= 1 + 0.08 * np.sin(2 * np.pi * 0.25 * t + rng.uniform(0, 6))
+        tr.add(x, 0, pan, 0.16)
+    for start_bar in (4, 10):                                                    # b2 dissonance
+        tr.add(synth_pad(midi_hz(53), 8 * beat, rng, (-8, 0, 8), 900, 1.5, 1.5), start_bar * 4 * beat, 0, 0.1)
+    pat = [(0, 80), (1.5, 80), (2, 120), (3, 80), (3.5, 120), (4, 80), (5, 120), (5.5, 80), (6, 80), (7, 120), (7.5, 120)]
+    for bar in range(0, bars, 2):
+        for k, f in pat:
+            tr.add(drum_tom(rng, f), bar * 4 * beat + k * beat, -0.3 if f == 80 else 0.3, 0.5 if f == 80 else 0.35)
+    for bar in range(bars):
+        tr.add(drum_kick(rng, 0.5), bar * 4 * beat, 0, 0.5)
+    for at_bar, at_beat in ((3, 2.5), (7, 1.0), (9, 3.5), (11, 2.0)):
+        n = samples(beat * 1.5)
+        x = sum(osc('saw', midi_hz(m), n) for m in (64, 65, 71)) / 3
+        x = lowpass(x, 1800) * adsr(n, 0.01, 0.3, 0.3, 0.3)
+        tr.add(echo(x, beat * 0.5, 0.4, 3), at_bar * 4 * beat + at_beat * beat, rng.uniform(-0.5, 0.5), 0.14)
+    return tr.finish(0.7, 20)
+
+
+def music_victory():
+    """12 s chip-tune fanfare in C major at 120 BPM with drums, clean ending."""
+    rng = seed_for('music_victory')
+    beat = 0.5
+    secs = 12.0
+    tr = Track(secs)
+    melody = [(72, 0.5), (72, 0.5), (72, 0.5), (76, 1.5), (79, 0.5), (76, 0.5),
+              (79, 1), (84, 1), (81, 0.5), (79, 0.5), (76, 0.5), (79, 0.5),
+              (81, 1), (84, 1), (83, 0.5), (79, 0.5), (76, 0.5), (79, 0.5),
+              (84, 0.5), (84, 0.5), (86, 0.5), (88, 1.5), (84, 1),
+              (79, 1), (84, 1), (88, 2),
+              (84, 4)]
+    pos = 0.0
+    for m, b in melody:
+        last = (m, b) == (84, 4)
+        x = synth_lead(midi_hz(m), beat * b * (1.0 if last else 0.92), 0.25)
+        if last:
+            x *= adsr(len(x), 0.01, 0.0, 1.0, 1.2)
+        tr.add(x, pos * beat, 0.15, 0.22)
+        tr.add(synth_lead(midi_hz(m - 12), beat * b * 0.9, 0.5) * (adsr(samples(beat * b * 0.9), 0.01, 0, 1, 1.0) if last else 1), pos * beat, -0.15, 0.09)
+        pos += b
+    chords = [(60, 64, 67), (65, 69, 72), (67, 71, 74), (60, 64, 67), (67, 71, 74), (60, 64, 67, 72)]
+    for bar, ch in enumerate(chords):
+        for k in range(4):
+            if bar == 5:
+                n = samples(beat * 4)
+                env = adsr(n, 0.01, 0.0, 1.0, 1.2)
+                if k:
+                    break
+            else:
+                n = samples(beat * 0.45)
+                env = adsr(n, 0.005, 0.05, 0.7, 0.05)
+            for m in ch:
+                tr.add(osc('square', midi_hz(m), n, duty=0.5) * env, (bar * 4 + k) * beat, -0.4 if m % 2 else 0.4, 0.06)
+    roots = [36, 41, 43, 36, 43, 36]
+    for bar, r in enumerate(roots):
+        for k in range(8):
+            if bar == 5 and k:
+                break
+            m = r + (12 if k % 2 else 0)
+            n = samples(beat * (4 if bar == 5 else 0.45))
+            env = adsr(n, 0.005, 0.1, 0.6, 1.0 if bar == 5 else 0.05)
+            tr.add(osc('tri', midi_hz(m), n) * env, (bar * 4 + k * 0.5) * beat, 0, 0.3)
+    for bar in range(6):
+        base = bar * 4 * beat
+        if bar == 5:
+            tr.add(drum_kick(rng), base, 0, 0.5)
+            tr.add(drum_hat(rng, open_=True), base, 0.3, 0.3)
+            tr.add(highpass(white(samples(1.2), rng), 3000) * env_exp(samples(1.2), 0.35), base, -0.2, 0.25)
+            break
+        for k in (0, 2):
+            tr.add(drum_kick(rng), base + k * beat, 0, 0.5)
+        for k in (1, 3):
+            tr.add(drum_snare(rng), base + k * beat, 0.1, 0.35)
+        for k in range(8):
+            tr.add(drum_hat(rng), base + k * beat / 2, 0.3, 0.12 if k % 2 == 0 else 0.07)
+        if bar == 4:                                                             # fill
+            for k in range(4):
+                tr.add(drum_snare(rng), base + 3 * beat + k * beat / 4, 0.1, 0.3)
+    return tr.finish(0.7, 15)
+
+
+MUSIC_SPECS = [('menu', music_menu), ('intermission', music_intermission), ('boss', music_boss),
+               ('hell', music_hell), ('victory', music_victory)]
+
+
+def gen_music():
+    for name, fn in MUSIC_SPECS:
+        write_wav(('music', name + '.wav'), fn())
+
+
+# ---------------------------------------------------------------------------
+# 6. contact sheet, verification, CLI
+# ---------------------------------------------------------------------------
+def write_contact_sheet(path):
+    """Every generated image on one labelled sheet (nearest-neighbour scaling)."""
+    if not GENERATED_IMAGES:
+        return
+    font = pg.font.Font(None, 15)
+    cell, box, cols = 150, 146, 8
+    rows = (len(GENERATED_IMAGES) + cols - 1) // cols
+    sheet = pg.Surface((cols * cell, rows * (cell + 18)))
+    sheet.fill((40, 40, 60))
+    for i, (label, p) in enumerate(GENERATED_IMAGES):
+        img = pg.image.load(p).convert_alpha()
+        w, h = img.get_size()
+        if w <= box and h <= box:
+            f = max(1, min(box // w, box // h))
+            img = pg.transform.scale(img, (w * f, h * f))
+        else:
+            f = min(box / w, box / h)
+            img = pg.transform.scale(img, (max(1, int(w * f)), max(1, int(h * f))))
+        x, y = (i % cols) * cell + 2, (i // cols) * (cell + 18) + 2
+        pg.draw.rect(sheet, (72, 72, 96), (x, y, box, box))
+        sheet.blit(img, (x + (box - img.get_width()) // 2, y + (box - img.get_height()) // 2))
+        sheet.blit(font.render(label, True, (230, 230, 230)), (x, y + box + 2))
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or '.', exist_ok=True)
+    pg.image.save(sheet, path)
+    print('contact sheet: %s (%d images)' % (path, len(GENERATED_IMAGES)))
+
+
+def expected_images():
+    """relative path -> (width, height) for every image this script produces."""
+    e = {}
+    for n in ('door', 'door_red', 'door_blue', 'door_yellow', 'exit_switch', 'exit_switch_on', '6', '7', '8', '9'):
+        e['textures/%s.png' % n] = (256, 256)
+    e['textures/sky_hell.png'] = e['textures/sky_night.png'] = (1200, 400)
+    for n in ('stimpack', 'medikit', 'armor_green', 'armor_blue', 'bullets', 'bullets_box', 'shells', 'shells_box',
+              'rockets', 'rockets_box', 'key_red', 'key_blue', 'key_yellow', 'backpack'):
+        e['sprites/pickups/%s.png' % n] = (64, 64)
+    for i in range(4):
+        e['sprites/pickups/soulsphere/%d.png' % i] = (64, 64)
+    for n in ('weapon_shotgun', 'weapon_chaingun', 'weapon_rocketlauncher'):
+        e['sprites/pickups/%s.png' % n] = (96, 48)
+    for i in range(2):
+        e['sprites/decorations/barrel/%d.png' % i] = (64, 96)
+    e['sprites/decorations/pillar.png'] = (64, 128)
+    e['sprites/decorations/skulls.png'] = (64, 48)
+    for i in range(3):
+        e['sprites/projectiles/fireball/%d.png' % i] = (48, 48)
+    for i in range(2):
+        e['sprites/projectiles/rocket/%d.png' % i] = (48, 48)
+    for i in range(6):
+        e['sprites/projectiles/explosion/%d.png' % i] = (128, 128)
+    for i in range(3):
+        e['sprites/projectiles/blood/%d.png' % i] = (32, 32)
+        e['sprites/projectiles/puff/%d.png' % i] = (32, 32)
+    for w in ('pistol', 'chaingun', 'rocket_launcher'):
+        for i in range(3):
+            e['sprites/weapon/%s/%d.png' % (w, i)] = (970, 1050)
+    return e
+
+
+def expected_audio():
+    """relative path -> (seconds, channels)."""
+    e = {'sound/%s.wav' % n: (secs, 1) for n, secs, _ in SOUND_SPECS}
+    e.update({'music/menu.wav': (40.0, 2), 'music/intermission.wav': (8 * 4 * 60 / 100, 2),
+              'music/boss.wav': (18 * 4 * 60 / 140, 2), 'music/hell.wav': (12 * 4 * 60 / 90, 2),
+              'music/victory.wav': (12.0, 2)})
+    return e
+
+
+FAMILY_OF = {'textures': 'textures', 'sprites': 'sprites', 'sound': 'sounds', 'music': 'music'}
+
+
+def verify(families):
+    """Assert every expected file of the generated families exists with the
+    exact size / format, print a table and exit 1 on any mismatch."""
+    rows = []
+    ok = True
+    for rel, (w, h) in expected_images().items():
+        if FAMILY_OF[rel.split('/')[0]] not in families:
+            continue
+        path = os.path.join(RES_DIR, rel)
+        if not os.path.exists(path):
+            rows.append((rel, '%dx%d' % (w, h), '-', 'MISSING', 0))
+            ok = False
+            continue
+        img = pg.image.load(path)
+        fmt = 'RGBA' if (img.get_bitsize() == 32 and img.get_flags() & pg.SRCALPHA) else 'RGB'
+        good = img.get_size() == (w, h) and (fmt == 'RGBA' or not rel.startswith('sprites/'))
+        rows.append((rel, '%dx%d' % (w, h), '%dx%d %s' % (img.get_width(), img.get_height(), fmt), 'ok' if good else 'BAD', os.path.getsize(path)))
+        ok &= good
+    for rel, (secs, ch) in expected_audio().items():
+        if FAMILY_OF[rel.split('/')[0]] not in families:
+            continue
+        path = os.path.join(RES_DIR, rel)
+        if not os.path.exists(path):
+            rows.append((rel, '%.2fs %dch' % (secs, ch), '-', 'MISSING', 0))
+            ok = False
+            continue
+        with wave.open(path, 'rb') as wv:
+            dur = wv.getnframes() / wv.getframerate()
+            got = '%.2fs %dch %dbit %dHz' % (dur, wv.getnchannels(), wv.getsampwidth() * 8, wv.getframerate())
+            good = abs(dur - secs) < 0.02 and wv.getnchannels() == ch and wv.getsampwidth() == 2 and wv.getframerate() == SR
+        rows.append((rel, '%.2fs %dch' % (secs, ch), got, 'ok' if good else 'BAD', os.path.getsize(path)))
+        ok &= good
+    width = max(len(r[0]) for r in rows) + 2
+    print('\n%-*s %-14s %-26s %-8s %s' % (width, 'file (resources/)', 'expected', 'actual', 'status', 'bytes'))
+    total = 0
+    for rel, exp, got, status, size in rows:
+        total += size
+        print('%-*s %-14s %-26s %-8s %d' % (width, rel, exp, got, status, size))
+    print('%d files, %.1f MB total, %s' % (len(rows), total / 1e6, 'all OK' if ok else 'PROBLEMS FOUND'))
+    if not ok:
+        sys.exit(1)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description='Procedurally generate KnotzDoom art, sound and music assets.')
+    ap.add_argument('--only', choices=['textures', 'sprites', 'sounds', 'music'],
+                    help='generate only this asset family (default: everything)')
+    ap.add_argument('--contact-sheet', metavar='PATH',
+                    help='additionally write a labelled contact sheet PNG of every generated image')
+    args = ap.parse_args(argv)
+    families = [args.only] if args.only else ['textures', 'sprites', 'sounds', 'music']
+    gens = {'textures': gen_textures, 'sprites': gen_sprites, 'sounds': gen_sounds, 'music': gen_music}
+    t0 = time.time()
+    for fam in families:
+        t1 = time.time()
+        gens[fam]()
+        print('generated %-8s in %5.1fs' % (fam, time.time() - t1))
+    if args.contact_sheet:
+        write_contact_sheet(args.contact_sheet)
+    verify(families)
+    print('finished in %.1fs' % (time.time() - t0))
+
+
+if __name__ == '__main__':
+    main()

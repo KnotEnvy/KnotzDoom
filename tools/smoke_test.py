@@ -66,6 +66,15 @@ class Walkthrough:
         self.game.state.menu.index = index
         self.press(pg.K_RETURN)
 
+    def skip_stories(self):
+        """Press through any story screens (intro, per-level, outro)."""
+        for _ in range(6):
+            if self.state_name() != 'StoryState':
+                return
+            self.press(pg.K_RETURN)      # finish typing
+            self.press(pg.K_RETURN)      # continue
+            self.run_frames(3)
+
     def state_name(self):
         return type(self.game.state).__name__
 
@@ -93,7 +102,8 @@ class Walkthrough:
         self.choose(0)
         self.expect('DifficultyState'); self.shot('06_difficulty')
         self.press(pg.K_RETURN)
-        self.expect('StoryState'); self.run_frames(120); self.shot('07_story'); self.press(pg.K_RETURN); self.press(pg.K_RETURN)
+        self.expect('StoryState'); self.run_frames(120); self.shot('07_story')
+        self.skip_stories()
         self.expect('PlayState')
         play = g.state
         self.run_frames(50)
@@ -111,12 +121,16 @@ class Walkthrough:
         self.keys.down.add(pg.K_w)
         self.run_frames(200)
         self.keys.down.discard(pg.K_w)
-        self.press(pg.K_e)
+        play = g.state
+        door = play.world.doors[(10, 3)]
+        self.press(pg.K_e)               # opens the door unless a monster beat us to it
+        assert door.state != 'closed', door.state
         self.run_frames(40)
         self.shot('10_door')
         self.keys.down.add(pg.K_w)
         self.run_frames(90)
         self.keys.down.discard(pg.K_w)
+        assert play.world.player.x > 11.0, f'player should have walked through the door, x={play.world.player.x:.2f}'
         self.shot('11_after_door')
         # automap
         self.press(pg.K_TAB); self.run_frames(5); self.shot('12_automap'); self.press(pg.K_TAB)
@@ -153,7 +167,9 @@ class Walkthrough:
         self.expect('IntermissionState'); self.run_frames(400); self.shot('21_intermission')
         self.press(pg.K_RETURN); self.run_frames(5); self.shot('22_entering'); self.press(pg.K_RETURN)
         self.run_frames(5)
-        print('final state:', self.state_name())
+        self.skip_stories()
+        self.expect('PlayState')
+        self.run_frames(30); self.shot('22b_level2')
         # outro story, victory screen and credits
         g.finish_episode(); self.run_frames(60); self.expect('StoryState'); self.shot('23_outro')
         self.press(pg.K_RETURN); self.press(pg.K_RETURN); self.expect('VictoryState'); self.run_frames(5); self.shot('24_victory')

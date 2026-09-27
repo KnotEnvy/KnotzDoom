@@ -86,9 +86,12 @@ def tint_surface(surface, mode):
     elif mode == 'blue':
         rgb[:, :, [0, 2]] = rgb[:, :, [2, 0]]
     elif mode == 'dark':
+        # black-clad variant: crush the greens/tans towards dark gray, keep the reds
         gray = rgb.mean(axis=2, keepdims=True)
-        mixed = (rgb * 0.45 + gray * 0.35).astype(np.uint8)
-        rgb[:, :, :] = mixed
+        mixed = rgb * 0.25 + gray * 0.3
+        red_mask = (rgb[:, :, 0].astype(np.int16) - rgb[:, :, 1].astype(np.int16)) > 60
+        mixed[red_mask] = rgb[red_mask] * 0.9
+        rgb[:, :, :] = np.clip(mixed, 0, 255).astype(np.uint8)
     elif mode == 'gold':
         r = np.clip(rgb[:, :, 0].astype(np.int16) + 40, 0, 255)
         g = np.clip(rgb[:, :, 1].astype(np.int16) * 0.9 + 30, 0, 255)

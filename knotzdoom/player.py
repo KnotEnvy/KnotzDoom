@@ -4,7 +4,7 @@ import random
 
 import pygame as pg
 
-from .settings import (DOOR_PASSABLE, MOUSE_BORDER_LEFT, MOUSE_BORDER_RIGHT, MOUSE_MAX_REL,
+from .settings import (DOOR_PASSABLE, HEIGHT, MOUSE_BORDER_LEFT, MOUSE_BORDER_RIGHT, MOUSE_MAX_REL,
                        MOUSE_SENSITIVITY, HALF_WIDTH, HALF_HEIGHT, PLAYER_MAX_ARMOR,
                        PLAYER_MAX_HEALTH, PLAYER_RADIUS, PLAYER_SPEED, PLAYER_SPRINT_MULT,
                        PLAYER_SUPER_HEALTH, USE_DISTANCE)
@@ -260,9 +260,11 @@ class Player:
     def mouse_control(self, dt):
         if self.game.mouse_grabbed:
             mx, my = pg.mouse.get_pos()
-            if mx < MOUSE_BORDER_LEFT or mx > MOUSE_BORDER_RIGHT:
-                pg.mouse.set_pos([HALF_WIDTH, HALF_HEIGHT])
             rel = pg.mouse.get_rel()[0]
+            if mx < MOUSE_BORDER_LEFT or mx > MOUSE_BORDER_RIGHT or my < 80 or my > HEIGHT - 80:
+                # re-centre the cursor and swallow the warp so the view never jumps
+                pg.mouse.set_pos([HALF_WIDTH, HALF_HEIGHT])
+                pg.mouse.get_rel()
             rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, rel))
         else:
             rel = 0

@@ -8,6 +8,10 @@ everything in between.
 
 ![KnotzDoom](screenshots/play.png)
 
+| Title | Intermission | Automap |
+| --- | --- | --- |
+| ![title](screenshots/title.png) | ![intermission](screenshots/intermission.png) | ![automap](screenshots/automap.png) |
+
 ## Running
 
 ```bash
@@ -60,6 +64,20 @@ ammo, keys and armor), `idclip` (walk through walls) and `iddt` (reveal the map)
 * **Juice**: distance shading, weapon bob and kick, head bob, muzzle flash
   lighting, screen shake, damage and pickup flashes, blood and bullet puffs,
   explosions, a camera that sinks to the floor when you die, level fade-ins.
+
+## The episode
+
+| # | Level | Theme | Par |
+| --- | --- | --- | --- |
+| 1 | Hangar Bay | Gray brick loading docks, first doors, keys and a hidden soulsphere | 1:30 |
+| 2 | Waste Tunnels | Mossy sewers, barrels, a cacodemon guarding the blue key | 2:30 |
+| 3 | Command Center | Night-time tech base, chaingun, red then blue key hunt | 3:20 |
+| 4 | The Furnace | Hell-brick reactor ring, rocket launcher, first hell knights | 4:00 |
+| 5 | Blood Cathedral | Banner-lined nave, three wings, three keys | 5:00 |
+| 6 | Cyber Throne | Guarded approach and a pillar arena against the cyberdemon | 4:00 |
+
+Top-down previews of every map are in `screenshots/maps/` (regenerate with
+`python tools/level_map.py`).
 
 ## Project layout
 
