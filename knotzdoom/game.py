@@ -25,8 +25,8 @@ class Game:
         self.headless = headless
         self.version = __version__
         self.config = Config()
-        flags = pg.FULLSCREEN if self.config['fullscreen'] and not headless else 0
-        self.screen = pg.display.set_mode(RES, flags)
+        self.set_window_icon()
+        self.screen = self.make_screen()
         pg.display.set_caption(TITLE)
         self.clock = pg.time.Clock()
         self.delta_time = 16
@@ -220,11 +220,34 @@ class Game:
         except pg.error:
             pass
 
+    def make_screen(self):
+        """Create the window.  The game renders at a fixed 1600x900; on
+        smaller desktops (or in fullscreen) pygame's SCALED mode fits it to
+        the display while keeping the aspect ratio."""
+        if self.headless:
+            return pg.display.set_mode(RES)
+        flags = 0
+        try:
+            info = pg.display.Info()
+            if self.config['fullscreen']:
+                flags = pg.FULLSCREEN | pg.SCALED
+            elif 0 < info.current_w < RES[0] or 0 < info.current_h < RES[1]:
+                flags = pg.SCALED
+            return pg.display.set_mode(RES, flags)
+        except pg.error:
+            return pg.display.set_mode(RES)
+
+    def set_window_icon(self):
+        try:
+            icon = pg.image.load(os.path.join(BASE_DIR, 'resources', 'sprites', 'npc', 'caco_demon', '0.png'))
+            pg.display.set_icon(pg.transform.smoothscale(icon, (32, 32)))
+        except (pg.error, FileNotFoundError):
+            pass
+
     def apply_fullscreen(self):
         if self.headless:
             return
-        flags = pg.FULLSCREEN if self.config['fullscreen'] else 0
-        self.screen = pg.display.set_mode(RES, flags)
+        self.screen = self.make_screen()
         self.config.save()
 
     def screenshot(self, path=None):
