@@ -10,25 +10,25 @@ WEAPON_DEFS = {
         'slot': 1, 'ammo': 'bullets', 'ammo_per_shot': 1, 'pickup_ammo': 20,
         'kind': 'hitscan', 'damage': (10, 16), 'pellets': 1, 'spread': 0.015,
         'rate': 380, 'frame_time': 70, 'sound': 'pistol', 'height': 0.46, 'kick': 10,
-        'label': 'PISTOL', 'smooth': True,
+        'label': 'PISTOL',
     },
     'shotgun': {
         'slot': 2, 'ammo': 'shells', 'ammo_per_shot': 1, 'pickup_ammo': 8,
         'kind': 'hitscan', 'damage': (5, 15), 'pellets': 7, 'spread': 0.075,
         'rate': 560, 'frame_time': 90, 'sound': 'shotgun', 'height': 0.47, 'kick': 22,
-        'label': 'SHOTGUN', 'smooth': True,
+        'label': 'SHOTGUN',
     },
     'chaingun': {
         'slot': 3, 'ammo': 'bullets', 'ammo_per_shot': 1, 'pickup_ammo': 40,
         'kind': 'hitscan', 'damage': (8, 14), 'pellets': 1, 'spread': 0.035,
         'rate': 105, 'frame_time': 52, 'sound': 'chaingun', 'height': 0.48, 'kick': 6,
-        'label': 'CHAINGUN', 'smooth': True,
+        'label': 'CHAINGUN',
     },
     'rocket_launcher': {
         'slot': 4, 'ammo': 'rockets', 'ammo_per_shot': 1, 'pickup_ammo': 4,
         'kind': 'rocket', 'damage': (90, 130), 'pellets': 1, 'spread': 0.0,
         'rate': 820, 'frame_time': 120, 'sound': 'rocket_launch', 'height': 0.48, 'kick': 26,
-        'label': 'ROCKET LAUNCHER', 'smooth': True,
+        'label': 'ROCKET LAUNCHER',
     },
 }
 WEAPON_SLOTS = {d['slot']: name for name, d in WEAPON_DEFS.items()}
@@ -52,14 +52,7 @@ class Weapon:
         self.kick = 0.0
 
     def load_frames(self, name, d):
-        raw = self.world.game.assets.frames('weapon/' + name)
-        target_h = int(HEIGHT * d['height'])
-        k = target_h / raw[0].get_height()
-        frames = []
-        for img in raw:
-            size = (max(1, int(img.get_width() * k)), max(1, int(img.get_height() * k)))
-            frames.append(pg.transform.smoothscale(img, size) if d['smooth'] else pg.transform.scale(img, size))
-        return frames
+        return self.world.game.assets.weapon_frames(name, int(HEIGHT * d['height']))
 
     # ------------------------------------------------------------ logic
     @property
@@ -94,7 +87,7 @@ class Weapon:
             return
         if ammo_type:
             player.ammo[ammo_type] -= d['ammo_per_shot']
-        self.cooldown = d['rate']
+        self.cooldown += d['rate']              # keep the overshoot so the rate is exact at any fps
         self.seq_index = 0
         self.anim_timer = 0.0
         self.frame = self.sequence[0] if self.sequence else 0

@@ -49,6 +49,8 @@ class SpriteObject:
     """A billboard drawn at a world position."""
 
     bright = False           # ignore distance shading (fire, glowing things)
+    bleeds = False           # spawns blood when shot (monsters)
+    radius = 0.3             # collision circle for shots and rockets
 
     def __init__(self, world, image, pos, scale=0.7, z=0.0):
         self.world = world
@@ -90,7 +92,7 @@ class SpriteObject:
         proj = view.screen_dist / self.norm_dist
         height = proj * self.scale
         width = height * iw / ih
-        self.screen_x = (view.half_num_rays + delta / view.delta_angle) * view.column
+        self.screen_x = view.half_width + math.tan(delta) * view.screen_dist
         self.half_width = width / 2
         left = self.screen_x - self.half_width
         if left + width < 0 or left > view.width or height < 1:

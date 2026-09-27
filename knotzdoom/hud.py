@@ -49,9 +49,8 @@ class HUD:
         return bar
 
     def build_face(self):
-        frames = self.assets.frames('npc/soldier/idle')
-        head = frames[0].subsurface((17, 0, 28, 28))
-        return pg.transform.scale(head, (72, 72))
+        head = self.assets.raw_frames('npc/soldier/idle')[0].subsurface((17, 0, 28, 28))
+        return pg.transform.scale(head, (72, 72)).convert_alpha()
 
     def build_face_states(self):
         """Progressively bloodier versions of the face as health drops."""
@@ -77,7 +76,7 @@ class HUD:
         return states
 
     def build_key_icon(self, color):
-        icon = self.assets.frame(f'pickups/key_{color}.png')
+        icon = self.assets.frame(f'pickups/key_{color}.png').convert_alpha()
         return pg.transform.scale(icon, (30, 30))
 
     # ------------------------------------------------------------ messages

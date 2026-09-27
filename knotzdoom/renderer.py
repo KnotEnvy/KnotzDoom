@@ -8,14 +8,17 @@ against the depth buffer so an enemy peeking around a corner is cut off by the
 wall exactly where it should be.
 """
 import math
+from collections import OrderedDict
 
 import numpy as np
 import pygame as pg
 
-from .assets import shade_brightness, shade_level
+from .assets import COLORKEY, shade_brightness, shade_level
 from .raycasting import RayCaster
-from .settings import FOV, SHADE_LEVELS, TEXTURE_SIZE
+from .settings import FOV, SHADE_LEVELS, SHADE_MAX_DEPTH, TEXTURE_SIZE
 from .view import View
+
+SHADE_CACHE_SIZE = 160          # shaded sprite sources kept (LRU)
 
 
 class Renderer:
@@ -26,6 +29,9 @@ class Renderer:
         self.world = world
         self.light = 0                       # extra brightness levels (muzzle flash)
         self._overlay_cache = {}
+        self._shade_cache = OrderedDict()
+        self._shaded_keys = {}
+        self.sprite_requests = []
         self.view = None
         self.set_detail(game.detail.divisor)
 
@@ -74,49 +80,93 @@ class Renderer:
         surface.blit(self.floor, (0, view.half_height))
 
     def draw_walls(self, cam):
+        """One texel-wide strip per column, scaled straight into the view."""
         view = self.view
-        wall_texture = self.assets.wall_texture
+        surface = view.surface
+        subsurface = surface.subsurface
+        wall_bank = self.assets.wall_bank
+        banks = self.assets.wall_banks
         light = self.light
         cam_h = cam.cam_h
         horizon = view.half_height
         height = view.height
-        column_w = view.column
-        tex_span = TEXTURE_SIZE - column_w
+        col_w = view.column
         scale = pg.transform.scale
-        blit = view.surface.blit
+        ceil = math.ceil
         darkest = SHADE_LEVELS - 1
-        for ray, (depth, proj_height, tex_id, offset, vertical) in enumerate(self.raycaster.results):
-            level = shade_level(depth, light)
-            if vertical and level < darkest:
+        levels_per_unit = darkest / SHADE_MAX_DEPTH
+        tex_size = TEXTURE_SIZE
+        x = 0
+        for depth, proj_height, tex_id, offset, x_side in self.raycaster.results:
+            level = int(depth * levels_per_unit) - light
+            if x_side:
                 level += 1
-            texture = wall_texture(tex_id, level)
-            u = int(offset * tex_span)
+            if level < 0:
+                level = 0
+            elif level > darkest:
+                level = darkest
+            bank = banks.get(tex_id)
+            texture = (bank or wall_bank(tex_id))[level]
             y0 = horizon - proj_height * (1.0 - cam_h)
             y1 = y0 + proj_height
-            if y0 >= 0 and y1 <= height:
-                column = scale(texture.subsurface(u, 0, column_w, TEXTURE_SIZE), (column_w, int(proj_height)))
-                blit(column, (ray * column_w, int(y0)))
+            if y0 >= 0.0 and y1 <= height:
+                top = int(y0)
+                h = int(y1) - top
+                tv0, tv1 = 0, tex_size
             else:
-                top = 0.0 if y0 < 0 else y0
+                top_f = 0.0 if y0 < 0.0 else y0
                 bottom = float(height) if y1 > height else y1
-                if bottom - top < 1:
-                    continue
-                v0 = (top - y0) / proj_height * TEXTURE_SIZE
-                v1 = (bottom - y0) / proj_height * TEXTURE_SIZE
-                tv0 = int(v0)
-                tv1 = int(math.ceil(v1))
-                if tv0 >= TEXTURE_SIZE:
-                    tv0 = TEXTURE_SIZE - 1
+                top = int(top_f)
+                h = int(bottom) - top
+                tv0 = int((top_f - y0) / proj_height * tex_size)
+                tv1 = int(ceil((bottom - y0) / proj_height * tex_size))
+                if tv0 >= tex_size:
+                    tv0 = tex_size - 1
                 if tv1 <= tv0:
                     tv1 = tv0 + 1
-                if tv1 > TEXTURE_SIZE:
-                    tv1 = TEXTURE_SIZE
-                column = scale(texture.subsurface(u, tv0, column_w, tv1 - tv0), (column_w, int(bottom - top)))
-                blit(column, (ray * column_w, int(top)))
+                elif tv1 > tex_size:
+                    tv1 = tex_size
+            if h >= 1:
+                tu = int(offset * tex_size)
+                if tu >= tex_size:
+                    tu = tex_size - 1
+                scale(texture.subsurface(tu, tv0, 1, tv1 - tv0), (col_w, h), subsurface(x, top, col_w, h))
+            x += col_w
 
     # ------------------------------------------------------------ sprites
     def add_sprite(self, depth, image, left, top, width, height, bright=False):
         self.sprite_requests.append((depth, image, left, top, width, height, bright))
+
+    def shaded_source(self, image, clip, level):
+        """A darkened copy of the (clipped) source frame, from a small LRU cache."""
+        key = (id(image), clip, level)
+        cache = self._shade_cache
+        surf = cache.get(key)
+        if surf is not None:
+            cache.move_to_end(key)
+            return surf
+        src = image if clip is None else image.subsurface(clip)
+        surf = src.copy()
+        k = int(255 * shade_brightness(level))
+        surf.fill((k, k, k), special_flags=pg.BLEND_RGB_MULT)
+        if image.get_colorkey() is not None:
+            surf.set_colorkey(self.shaded_colorkey(level))
+        cache[key] = surf
+        if len(cache) > SHADE_CACHE_SIZE:
+            cache.popitem(last=False)
+        return surf
+
+    def shaded_colorkey(self, level):
+        """What COLORKEY becomes after the multiply of shade ``level``."""
+        key = self._shaded_keys.get(level)
+        if key is None:
+            probe = pg.Surface((1, 1))
+            probe.fill(COLORKEY)
+            k = int(255 * shade_brightness(level))
+            probe.fill((k, k, k), special_flags=pg.BLEND_RGB_MULT)
+            key = probe.get_at((0, 0))[:3]
+            self._shaded_keys[level] = key
+        return key
 
     def draw_sprites(self):
         view = self.view
@@ -139,7 +189,7 @@ class Renderer:
                 continue
             iw, ih = image.get_size()
             if vx0 == int(left) and vx1 == int(left + width) and vy0 == int(top) and vy1 == int(top + height):
-                sub = image
+                clip = None
             else:
                 sx0 = int((vx0 - left) / width * iw)
                 sx1 = int(math.ceil((vx1 - left) / width * iw))
@@ -149,13 +199,13 @@ class Renderer:
                 sy0 = max(0, min(ih - 1, sy0))
                 sx1 = max(sx0 + 1, min(iw, sx1))
                 sy1 = max(sy0 + 1, min(ih, sy1))
-                sub = image.subsurface((sx0, sy0, sx1 - sx0, sy1 - sy0))
-            scaled = pg.transform.scale(sub, (vx1 - vx0, vy1 - vy0))
-            if not bright:
-                level = shade_level(depth, light)
-                if level > 0:
-                    k = int(255 * shade_brightness(level))
-                    scaled.fill((k, k, k), special_flags=pg.BLEND_RGB_MULT)
+                clip = (sx0, sy0, sx1 - sx0, sy1 - sy0)
+            level = 0 if bright else shade_level(depth, light)
+            if level > 0:
+                src = self.shaded_source(image, clip, level)
+            else:
+                src = image if clip is None else image.subsurface(clip)
+            scaled = pg.transform.scale(src, (vx1 - vx0, vy1 - vy0))
             if vis.all():
                 surface.blit(scaled, (vx0, vy0))
                 continue

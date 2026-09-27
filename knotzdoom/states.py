@@ -650,7 +650,7 @@ class PlayState(State):
         if world.player_dead and not self.death_shown and world.player.death_timer > 1300:
             self.death_shown = True
             self.game.push(DeathState(self.game, self))
-        if world.exit_triggered and not self.finished and world.exit_timer > 900:
+        if world.exit_triggered and not self.finished and world.exit_timer > 900 and world.player.alive:
             self.finished = True
             self.game.level_complete(self)
 
@@ -726,9 +726,10 @@ class PauseState(State):
         self.game.pop()
 
     def restart(self):
+        """Restart from the state the level was entered with (no farming pickups)."""
         self.game.pop()
         self.game.start_level(self.play.level_index, self.play.world.difficulty_index,
-                              carry_state=self.play.world.player.carry_state() if self.play.world.player.alive else None)
+                              carry_state=self.game.session.get('carry'))
 
     def quit_to_menu(self):
         self.game.audio.play('menu_back')
@@ -816,6 +817,7 @@ class DeathState(State):
     def enter(self):
         self.game.set_mouse_grab(False)
         self.game.records['deaths'] = self.game.records.get('deaths', 0) + 1
+        self.game.session['deaths'] = self.game.session.get('deaths', 0) + 1
         self.game.save_records()
 
     def handle_event(self, event):

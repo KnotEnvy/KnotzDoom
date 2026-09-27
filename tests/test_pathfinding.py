@@ -30,8 +30,8 @@ def test_no_corner_cutting(world):
 def test_locked_doors_block_monsters(world):
     pf = world.pathfinding
     for pos, door in world.doors.items():
-        if door.locked:
-            assert pos not in pf.graph
+        if door.locked or door.secret:
+            assert pos not in pf.graph        # monsters neither unlock doors nor give away secrets
         else:
             assert pos in pf.graph
 

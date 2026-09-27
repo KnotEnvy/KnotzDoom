@@ -3,10 +3,9 @@ import math
 
 import pygame as pg
 
-from .settings import (HEIGHT, MOUSE_BORDER_LEFT, MOUSE_BORDER_RIGHT, MOUSE_MAX_REL,
-                       MOUSE_SENSITIVITY, HALF_WIDTH, HALF_HEIGHT, PLAYER_MAX_ARMOR,
-                       PLAYER_MAX_HEALTH, PLAYER_RADIUS, PLAYER_ROT_SPEED, PLAYER_SPEED,
-                       PLAYER_SPRINT_MULT, USE_DISTANCE)
+from .settings import (HEIGHT, MOUSE_BORDER, MOUSE_MAX_PIXELS_PER_SEC, MOUSE_RAD_PER_PIXEL, WIDTH,
+                       HALF_WIDTH, HALF_HEIGHT, PLAYER_MAX_ARMOR, PLAYER_MAX_HEALTH, PLAYER_RADIUS,
+                       PLAYER_ROT_SPEED, PLAYER_SPEED, PLAYER_SPRINT_MULT, USE_DISTANCE)
 from .weapons import WEAPON_DEFS, WEAPON_SLOTS, Weapon
 
 AMMO_MAX = {'bullets': 200, 'shells': 50, 'rockets': 50}
@@ -152,9 +151,9 @@ class Player:
         if not self.alive:
             return
         amount = int(round(amount))
-        if amount <= 0:
-            return
         world = self.world
+        if amount <= 0 or world.exit_triggered:      # nothing can hurt you once the exit is hit
+            return
         if self.god:
             world.fx.damage_flash = max(world.fx.damage_flash, 40)
             return
@@ -203,39 +202,23 @@ class Player:
 
     def movement(self, dt):
         keys = pg.key.get_pressed()
-        sin_a = math.sin(self.angle)
-        cos_a = math.cos(self.angle)
-        dx = dy = 0.0
-        pressed = 0
-        self.sprinting = bool(keys[pg.K_LSHIFT] or keys[pg.K_RSHIFT]) != bool(self.config['always_run'])
-        speed = PLAYER_SPEED * dt * (PLAYER_SPRINT_MULT if self.sprinting else 1.0)
-        if keys[pg.K_w] or keys[pg.K_UP]:
-            dx += speed * cos_a
-            dy += speed * sin_a
-            pressed += 1
-        if keys[pg.K_s] or keys[pg.K_DOWN]:
-            dx -= speed * cos_a
-            dy -= speed * sin_a
-            pressed += 1
-        if keys[pg.K_a]:
-            dx += speed * sin_a
-            dy -= speed * cos_a
-            pressed += 1
-        if keys[pg.K_d]:
-            dx -= speed * sin_a
-            dy += speed * cos_a
-            pressed += 1
+        forward = (keys[pg.K_w] or keys[pg.K_UP]) - (keys[pg.K_s] or keys[pg.K_DOWN])
+        strafe = keys[pg.K_d] - keys[pg.K_a]
         if keys[pg.K_LEFT]:
             self.angle -= PLAYER_ROT_SPEED * dt
         if keys[pg.K_RIGHT]:
             self.angle += PLAYER_ROT_SPEED * dt
-        if pressed > 1:
-            dx *= 0.7071
-            dy *= 0.7071
-        self.moving = pressed > 0
-        if self.moving:
-            self.try_move(dx, dy)
         self.angle %= math.tau
+        self.moving = bool(forward or strafe)
+        if not self.moving:
+            return
+        self.sprinting = bool(keys[pg.K_LSHIFT] or keys[pg.K_RSHIFT]) != bool(self.config['always_run'])
+        speed = PLAYER_SPEED * dt * (PLAYER_SPRINT_MULT if self.sprinting else 1.0)
+        # direction in player space, normalised so diagonals are not faster
+        length = math.hypot(forward, strafe)
+        forward, strafe = forward / length * speed, strafe / length * speed
+        sin_a, cos_a = math.sin(self.angle), math.cos(self.angle)
+        self.try_move(forward * cos_a - strafe * sin_a, forward * sin_a + strafe * cos_a)
 
     def try_move(self, dx, dy):
         """Move with wall sliding: each axis is tried separately."""
@@ -243,25 +226,28 @@ class Player:
             self.x += dx
             self.y += dy
             return
-        blocked = self.world.circle_blocked
-        if not blocked(self.x + dx, self.y, PLAYER_RADIUS):
+        step_blocked = self.world.step_blocked
+        if not step_blocked(self.x, self.y, self.x + dx, self.y, PLAYER_RADIUS):
             self.x += dx
-        if not blocked(self.x, self.y + dy, PLAYER_RADIUS):
+        if not step_blocked(self.x, self.y, self.x, self.y + dy, PLAYER_RADIUS):
             self.y += dy
 
     def mouse_control(self, dt):
-        if self.game.mouse_grabbed:
-            mx, my = pg.mouse.get_pos()
-            rel = pg.mouse.get_rel()[0]
-            if mx < MOUSE_BORDER_LEFT or mx > MOUSE_BORDER_RIGHT or my < 80 or my > HEIGHT - 80:
-                # re-centre the cursor and swallow the warp so the view never jumps
-                pg.mouse.set_pos([HALF_WIDTH, HALF_HEIGHT])
-                pg.mouse.get_rel()
-            rel = max(-MOUSE_MAX_REL, min(MOUSE_MAX_REL, rel))
-        else:
-            rel = 0
-        self.angle += rel * MOUSE_SENSITIVITY * self.config['mouse_sensitivity'] * dt
-        self.angle %= math.tau
+        if not self.game.mouse_grabbed:
+            return
+        mx, my = pg.mouse.get_pos()
+        rel = pg.mouse.get_rel()[0]
+        if mx < MOUSE_BORDER or mx > WIDTH - MOUSE_BORDER or my < MOUSE_BORDER or my > HEIGHT - MOUSE_BORDER:
+            # re-centre the cursor and swallow the warp so the view never jumps
+            pg.mouse.set_pos([HALF_WIDTH, HALF_HEIGHT])
+            pg.mouse.get_rel()
+        self.turn_by_pixels(rel, dt)
+
+    def turn_by_pixels(self, rel, dt):
+        """Turn by a mouse delta; the turn per pixel does not depend on the frame rate."""
+        limit = MOUSE_MAX_PIXELS_PER_SEC * dt / 1000.0
+        rel = max(-limit, min(limit, rel))
+        self.angle = (self.angle + rel * MOUSE_RAD_PER_PIXEL * self.config['mouse_sensitivity']) % math.tau
 
     # ------------------------------------------------------------ use
     def use(self):

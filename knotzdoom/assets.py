@@ -1,9 +1,11 @@
 """Asset loading and caching.
 
 Wall textures are stored in "shade banks": ``SHADE_LEVELS`` pre-darkened copies
-so that distance shading costs nothing per frame (the same trick the original
-Doom used with its COLORMAP light levels).  Sprite frames are loaded once per
-directory and shared between every entity that uses them.
+built lazily per texture so distance shading costs nothing per frame (the same
+trick the original Doom used with its COLORMAP light levels).  Sprite frames
+are loaded once per directory and shared between every entity that uses them;
+frames whose alpha is essentially binary are converted to colorkey surfaces,
+which blit about three times faster than per-pixel alpha.
 """
 import os
 
@@ -32,7 +34,10 @@ TEXTURE_FILES = {
     TEX_EXIT_ON: 'exit_switch_on.png',
 }
 
+COLORKEY = (255, 0, 254)          # transparent colour of colorkey sprites
 _IMAGE_EXT = ('.png', '.bmp', '.jpg')
+# sprite directories drawn with soft edges (explosions, smoke) keep per-pixel alpha
+_SOFT_ALPHA_DIRS = ('projectiles',)
 
 
 def shade_brightness(level):
@@ -53,11 +58,10 @@ def shade_level(depth, light_offset=0):
 
 def darken(surface, brightness):
     """Return a darkened copy of ``surface`` keeping its alpha channel."""
-    if brightness >= 0.999:
-        return surface.copy()
     out = surface.copy()
-    value = max(0, min(255, int(255 * brightness)))
-    out.fill((value, value, value), special_flags=pg.BLEND_RGB_MULT)
+    if brightness < 0.999:
+        value = max(0, min(255, int(255 * brightness)))
+        out.fill((value, value, value), special_flags=pg.BLEND_RGB_MULT)
     return out
 
 
@@ -74,10 +78,10 @@ def placeholder_surface(size, color=(255, 0, 255)):
 
 
 def tint_surface(surface, mode):
-    """Create a palette-swapped variant of a sprite frame.
+    """Create a palette-swapped variant of an RGBA sprite frame.
 
     ``mode`` is one of: 'green' (swap red/green), 'blue' (swap red/blue),
-    'dark' (darker, desaturated), 'gold' (warm yellow), 'gray'.
+    'dark' (black-clad: crush greens/tans, keep reds), 'gold', 'gray'.
     """
     out = surface.copy()
     rgb = pg.surfarray.pixels3d(out)
@@ -86,25 +90,42 @@ def tint_surface(surface, mode):
     elif mode == 'blue':
         rgb[:, :, [0, 2]] = rgb[:, :, [2, 0]]
     elif mode == 'dark':
-        # black-clad variant: crush the greens/tans towards dark gray, keep the reds
         gray = rgb.mean(axis=2, keepdims=True)
         mixed = rgb * 0.25 + gray * 0.3
         red_mask = (rgb[:, :, 0].astype(np.int16) - rgb[:, :, 1].astype(np.int16)) > 60
         mixed[red_mask] = rgb[red_mask] * 0.9
         rgb[:, :, :] = np.clip(mixed, 0, 255).astype(np.uint8)
     elif mode == 'gold':
-        r = np.clip(rgb[:, :, 0].astype(np.int16) + 40, 0, 255)
-        g = np.clip(rgb[:, :, 1].astype(np.int16) * 0.9 + 30, 0, 255)
-        b = (rgb[:, :, 2] * 0.5).astype(np.uint8)
-        rgb[:, :, 0] = r
-        rgb[:, :, 1] = g
-        rgb[:, :, 2] = b
+        rgb[:, :, 0] = np.clip(rgb[:, :, 0].astype(np.int16) + 40, 0, 255)
+        rgb[:, :, 1] = np.clip(rgb[:, :, 1] * 0.9 + 30, 0, 255)
+        rgb[:, :, 2] = (rgb[:, :, 2] * 0.5).astype(np.uint8)
     elif mode == 'gray':
         gray = rgb.mean(axis=2).astype(np.uint8)
-        rgb[:, :, 0] = gray
-        rgb[:, :, 1] = gray
-        rgb[:, :, 2] = gray
+        rgb[:, :, 0] = rgb[:, :, 1] = rgb[:, :, 2] = gray
     del rgb
+    return out
+
+
+def to_colorkey(image):
+    """Convert an RGBA frame to an opaque colorkey surface when its alpha is
+    (almost) binary; soft edged images are returned unchanged."""
+    if image.get_colorkey() is not None:
+        return image
+    alpha = pg.surfarray.pixels_alpha(image)
+    semi = np.count_nonzero((alpha > 8) & (alpha < 248))
+    size = alpha.size
+    del alpha
+    if semi > 0.01 * size:
+        return image
+    hard = image.copy()
+    alpha = pg.surfarray.pixels_alpha(hard)
+    alpha[:] = np.where(alpha >= 128, 255, 0)
+    del alpha
+    out = pg.Surface(image.get_size())
+    out.fill(COLORKEY)
+    out.blit(hard, (0, 0))
+    out = out.convert()
+    out.set_colorkey(COLORKEY)
     return out
 
 
@@ -112,26 +133,24 @@ class Assets:
     """Central cache of every image used by the engine."""
 
     def __init__(self):
-        self.wall_banks = {}       # tex id -> [surface per shade level]
-        self.frames_cache = {}     # (dir, variant) -> [surfaces]
-        self.image_cache = {}      # path -> surface
+        self.wall_banks = {}       # tex id -> [surface per shade level], built on demand
+        self.raw_cache = {}        # sprite dir -> RGBA frames (kept for tint variants)
+        self.frames_cache = {}     # (dir, variant) -> draw-ready frames
+        self.single_cache = {}     # (file, variant) -> draw-ready image
+        self.weapon_cache = {}     # (name, height) -> scaled frames
         self.sky_cache = {}
         self.missing = []          # asset paths that could not be found
-        self.load_wall_textures()
         self.digits = self.load_digits()
 
     # ------------------------------------------------------------ helpers
     def load_image(self, path, alpha=True):
-        if path in self.image_cache:
-            return self.image_cache[path]
+        """Decode an image file (no caching: callers keep what they derive)."""
         try:
             img = pg.image.load(path)
-            img = img.convert_alpha() if alpha else img.convert()
+            return img.convert_alpha() if alpha else img.convert()
         except (pg.error, FileNotFoundError):
             self.missing.append(path)
-            img = placeholder_surface((64, 64))
-        self.image_cache[path] = img
-        return img
+            return placeholder_surface((64, 64))
 
     def get_texture(self, path, res=(TEXTURE_SIZE, TEXTURE_SIZE)):
         img = self.load_image(path)
@@ -140,15 +159,17 @@ class Assets:
         return img
 
     # ------------------------------------------------------------ walls
-    def load_wall_textures(self):
-        for tex_id, filename in TEXTURE_FILES.items():
-            path = os.path.join(TEX_DIR, filename)
-            base = self.get_texture(path).convert_alpha()
-            self.wall_banks[tex_id] = [darken(base, shade_brightness(lvl)) for lvl in range(SHADE_LEVELS)]
+    def wall_bank(self, tex_id):
+        bank = self.wall_banks.get(tex_id)
+        if bank is None:
+            filename = TEXTURE_FILES.get(tex_id, TEXTURE_FILES[1])
+            base = self.get_texture(os.path.join(TEX_DIR, filename)).convert()
+            bank = [darken(base, shade_brightness(lvl)) for lvl in range(SHADE_LEVELS)]
+            self.wall_banks[tex_id] = bank
+        return bank
 
     def wall_texture(self, tex_id, level=0):
-        bank = self.wall_banks.get(tex_id) or self.wall_banks[1]
-        return bank[level]
+        return self.wall_bank(tex_id)[level]
 
     # ------------------------------------------------------------ sky
     def sky(self, name='sky', size=(WIDTH, HALF_HEIGHT)):
@@ -162,42 +183,75 @@ class Assets:
 
     # ------------------------------------------------------------ digits
     def load_digits(self, size=64):
-        digits = {}
-        for i in range(11):
-            path = os.path.join(TEX_DIR, 'digits', f'{i}.png')
-            digits[str(i)] = self.get_texture(path, (size, size))
-        return digits
+        return {str(i): self.get_texture(os.path.join(TEX_DIR, 'digits', f'{i}.png'), (size, size))
+                for i in range(11)}
 
     # ------------------------------------------------------------ sprites
-    def frames(self, rel_dir, variant=None):
-        """All frames in ``resources/sprites/<rel_dir>`` sorted by file name."""
-        key = (rel_dir, variant)
-        if key in self.frames_cache:
-            return self.frames_cache[key]
-        if variant is not None:
-            base = self.frames(rel_dir)
-            result = [tint_surface(img, variant) for img in base]
-            self.frames_cache[key] = result
-            return result
+    def raw_frames(self, rel_dir):
+        """RGBA frames of ``resources/sprites/<rel_dir>`` sorted by file name."""
+        if rel_dir in self.raw_cache:
+            return self.raw_cache[rel_dir]
         path = os.path.join(SPRITE_DIR, rel_dir)
         result = []
         if os.path.isdir(path):
             names = sorted(n for n in os.listdir(path) if n.lower().endswith(_IMAGE_EXT))
-            for name in names:
-                result.append(self.load_image(os.path.join(path, name)))
+            result = [self.load_image(os.path.join(path, name)) for name in names]
         if not result:
             self.missing.append(path)
             result = [placeholder_surface((64, 64))]
+        self.raw_cache[rel_dir] = result
+        return result
+
+    def frames(self, rel_dir, variant=None):
+        """Draw-ready frames (colorkey where possible), optionally palette swapped."""
+        key = (rel_dir, variant)
+        if key in self.frames_cache:
+            return self.frames_cache[key]
+        raw = self.raw_frames(rel_dir)
+        if variant is not None:
+            raw = [tint_surface(img, variant) for img in raw]
+        soft = rel_dir.split('/')[0] in _SOFT_ALPHA_DIRS
+        result = raw if soft else [to_colorkey(img) for img in raw]
         self.frames_cache[key] = result
         return result
 
     def frame(self, rel_path, variant=None):
-        """A single sprite image ``resources/sprites/<rel_path>``."""
-        key = ('file:' + rel_path, variant)
-        if key in self.frames_cache:
-            return self.frames_cache[key][0]
+        """A single draw-ready sprite image ``resources/sprites/<rel_path>``."""
+        key = (rel_path, variant)
+        if key in self.single_cache:
+            return self.single_cache[key]
         img = self.load_image(os.path.join(SPRITE_DIR, rel_path))
         if variant is not None:
             img = tint_surface(img, variant)
-        self.frames_cache[key] = [img]
+        img = to_colorkey(img)
+        self.single_cache[key] = img
         return img
+
+    def sprite_frames(self, defn):
+        """Frames for an entity definition with either ``frames`` (dir) or ``image`` (file)."""
+        if 'frames' in defn:
+            return self.frames(defn['frames'], defn.get('variant'))
+        return [self.frame(defn['image'], defn.get('variant'))]
+
+    def weapon_frames(self, name, height):
+        """First person weapon frames scaled once so that frame 0 is ``height`` px tall;
+        the large source images are not kept."""
+        key = (name, height)
+        if key in self.weapon_cache:
+            return self.weapon_cache[key]
+        path = os.path.join(SPRITE_DIR, 'weapon', name)
+        frames = []
+        if os.path.isdir(path):
+            names = sorted(n for n in os.listdir(path) if n.lower().endswith(_IMAGE_EXT))
+            k = None
+            for n in names:
+                img = self.load_image(os.path.join(path, n))
+                if k is None:
+                    k = height / img.get_height()
+                size = (max(1, int(img.get_width() * k)), max(1, int(img.get_height() * k)))
+                frames.append(pg.transform.smoothscale(img, size))
+        if not frames:
+            self.missing.append(path)
+            frames = [placeholder_surface((64, 64))]
+        self.weapon_cache[key] = frames
+        return frames

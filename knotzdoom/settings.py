@@ -33,10 +33,9 @@ PLAYER_MAX_HEALTH = 100
 PLAYER_SUPER_HEALTH = 200
 PLAYER_MAX_ARMOR = 200
 
-MOUSE_SENSITIVITY = 0.0003
-MOUSE_MAX_REL = 40
-MOUSE_BORDER_LEFT = 100
-MOUSE_BORDER_RIGHT = WIDTH - MOUSE_BORDER_LEFT
+MOUSE_RAD_PER_PIXEL = 0.005     # turn per mouse pixel, independent of frame rate
+MOUSE_MAX_PIXELS_PER_SEC = 2500 # flicks faster than this are clamped
+MOUSE_BORDER = 100              # re-centre the cursor when it gets this close to an edge
 
 # ---------------------------------------------------------------- raycasting
 # (ray counts, column width and projection distance depend on the detail level
@@ -57,7 +56,8 @@ STATUS_BAR_HEIGHT = 96         # the 3d view is drawn full screen; the bar overl
 # ---------------------------------------------------------------- gameplay
 DOOR_OPEN_TIME = 450           # ms for a door to slide fully open
 DOOR_STAY_OPEN = 4000          # ms a door stays open before closing
-DOOR_PASSABLE = 0.7            # open fraction from which things can pass
+DOOR_PASSABLE = 0.9            # open fraction from which things can walk through
+DOOR_SLAB_THICKNESS = 0.12     # half thickness of the slab that stops shots and rockets
 USE_DISTANCE = 1.2             # how far the "use" action reaches
 
 DIFFICULTIES = [

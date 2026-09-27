@@ -30,7 +30,7 @@ class Projectile(AnimatedSprite):
         self.vx = math.cos(angle) * d['speed']
         self.vy = math.sin(angle) * d['speed']
         self.age = 0.0
-        if world.blocks_projectile(self.map_pos):
+        if world.blocks_point(self.x, self.y):
             self.explode()
 
     def update(self, dt):
@@ -48,7 +48,7 @@ class Projectile(AnimatedSprite):
         for _ in range(steps):
             nx = self.x + self.vx * seconds / steps
             ny = self.y + self.vy * seconds / steps
-            if world.blocks_projectile((int(nx), int(ny))):
+            if world.blocks_point(nx, ny):
                 self.explode()
                 return
             self.x, self.y = nx, ny

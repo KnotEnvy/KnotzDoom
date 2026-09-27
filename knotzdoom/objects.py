@@ -105,7 +105,7 @@ class ObjectHandler:
         dist = random.uniform(0.6, 1.4)
         px = player.x + math.cos(angle) * dist + random.uniform(-0.4, 0.4)
         py = player.y + math.sin(angle) * dist + random.uniform(-0.4, 0.4)
-        if not self.world.blocks_projectile((int(px), int(py))):
+        if not self.world.blocks_point(px, py):
             self.spawn_puff((px, py), random.uniform(0.2, 0.7))
 
     # ------------------------------------------------------------ persistence
@@ -128,4 +128,5 @@ class ObjectHandler:
                 if isinstance(prop, Barrel) and prop.index not in left:
                     prop.alive = False
                     self.world.solid_tiles.discard(prop.map_pos)
+                    self.world.pathfinding.refresh_tile(prop.map_pos)
             self.props = [p for p in self.props if p.alive]

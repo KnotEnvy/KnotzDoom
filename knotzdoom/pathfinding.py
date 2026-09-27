@@ -21,33 +21,45 @@ class PathFinding:
         self.build_graph()
 
     def passable(self, tile):
-        """Tiles enemies may walk over: floor and doors they can open."""
+        """Tiles monsters may walk over: floor, and doors they can open
+        (not locked ones, and not secret doors, which they would give away)."""
         world = self.world
-        if tile in world.walls:
+        if tile in world.walls or tile in world.solid_tiles:
             return False
         door = world.doors.get(tile)
-        if door is not None and door.locked:
+        if door is not None and (door.locked or door.secret):
             return False
-        level = world.level
-        return 0 <= tile[0] < level.cols and 0 <= tile[1] < level.rows
+        return world.inside(tile[0], tile[1])
+
+    def neighbours(self, tile):
+        x, y = tile
+        result = []
+        for dx, dy in STEPS:
+            nxt = (x + dx, y + dy)
+            if not self.passable(nxt):
+                continue
+            if dx and dy and not (self.passable((x + dx, y)) and self.passable((x, y + dy))):
+                continue
+            result.append(nxt)
+        return result
 
     def build_graph(self):
         level = self.world.level
         self.graph = {}
         for y in range(level.rows):
             for x in range(level.cols):
-                tile = (x, y)
-                if not self.passable(tile):
-                    continue
-                neighbours = []
-                for dx, dy in STEPS:
-                    nxt = (x + dx, y + dy)
-                    if not self.passable(nxt):
-                        continue
-                    if dx and dy and not (self.passable((x + dx, y)) and self.passable((x, y + dy))):
-                        continue
-                    neighbours.append(nxt)
-                self.graph[tile] = neighbours
+                if self.passable((x, y)):
+                    self.graph[(x, y)] = self.neighbours((x, y))
+
+    def refresh_tile(self, tile):
+        """Re-link a tile and its neighbours after it changed (a barrel blew up)."""
+        x, y = tile
+        for dx, dy in STEPS + ((0, 0),):
+            t = (x + dx, y + dy)
+            if self.passable(t):
+                self.graph[t] = self.neighbours(t)
+            else:
+                self.graph.pop(t, None)
 
     def update(self, dt):
         self.timer += dt

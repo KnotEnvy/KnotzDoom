@@ -5,7 +5,7 @@ import numpy as np
 
 import pygame as pg
 
-from knotzdoom.raycasting import RayCaster, cast_single_ray, line_of_sight
+from knotzdoom.raycasting import RayCaster, line_of_sight, trace
 from knotzdoom.settings import RES, WIDTH
 
 HALF_NUM_RAYS = WIDTH // 4
@@ -38,9 +38,16 @@ class FakeWorld:
                 self.walls[(6, y)] = 2
         door = FakeDoor(6, 3, vertical=True, open_=door_open)
         self.doors = {(6, 3): door}
-        self.doors_v = {(6, 3): door}
-        self.doors_h = {}
+        self.door_list = [door]
+        self.cols, self.rows = 12, 8
+        self.cells = [0] * (12 * 8)
+        for (x, y), tex in self.walls.items():
+            self.cells[y * 12 + x] = tex
+        self.cells[3 * 12 + 6] = -1
         self.seen_tiles = set()
+
+    def inside(self, x, y):
+        return 0 <= x < self.cols and 0 <= y < self.rows
 
 
 class Cam:
@@ -106,10 +113,40 @@ def test_low_detail_casts_half_the_rays_with_the_same_geometry():
     assert abs(float(low.depth[len(low.depth) // 2]) - float(high.depth[len(high.depth) // 2])) < 0.02
 
 
-def test_single_ray_and_line_of_sight():
+def test_trace_and_line_of_sight():
     world = FakeWorld(door_open=0.0)
-    assert abs(cast_single_ray(world, 2.5, 3.5, 0.0) - 3.5) < 0.05   # closed door tile at x = 6
+    assert abs(trace(world, 2.5, 3.5, 0.0) - 4.0) < 0.05     # closed slab at x = 6.5
     world.doors[(6, 3)].open = 1.0
-    assert abs(cast_single_ray(world, 2.5, 3.5, 0.0) - 8.5) < 0.05
+    assert abs(trace(world, 2.5, 3.5, 0.0) - 8.5) < 0.05
     assert line_of_sight(world, 2.5, 3.5, 9.5, 3.5)
-    assert not line_of_sight(world, 2.5, 2.5, 9.5, 2.5)               # wall segment at (6, 2)
+    assert not line_of_sight(world, 2.5, 2.5, 9.5, 2.5)     # wall segment at (6, 2)
+
+
+def test_camera_inside_door_tile_still_sees_the_slab():
+    world = FakeWorld(door_open=0.0)
+    depth, result = center_depth(world, Cam(6.2, 3.5, 0.0))   # inside the door tile, slab ahead at 6.5
+    assert abs(depth - 0.3) < 0.05 and result[2] == 10
+
+
+def test_straight_wall_edge_is_straight():
+    """With tangent spaced rays, a wall seen obliquely projects to a straight line."""
+    world = FakeWorld(door_open=1.0)
+    caster = make_caster(world)
+    cam = Cam(2.0, 6.5, -0.35)                 # looking up-right along the north wall
+    caster.cast(cam)
+    tops = []
+    for i, (depth, proj_height, tex, u, side) in enumerate(caster.results):
+        t = depth / caster.fish[i]
+        hit_y = cam.y + t * math.sin(cam.angle + caster.offsets[i])
+        if not side and abs(hit_y - 1.0) < 0.01:   # hits on the north wall's face y = 1
+            tops.append(450 - proj_height * 0.5)
+    assert len(tops) > 20
+    slopes = [tops[i + 1] - tops[i] for i in range(len(tops) - 1)]
+    assert max(slopes) - min(slopes) < 1.5     # the top edge is a straight line
+
+
+def test_noclip_outside_the_map_draws_nothing_solid():
+    world = FakeWorld()
+    caster = make_caster(world)
+    caster.cast(Cam(-3.0, -3.0, 0.4))
+    assert float(caster.depth.min()) >= 20

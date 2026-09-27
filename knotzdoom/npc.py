@@ -53,6 +53,8 @@ NPC_DEFS = {
 
 
 class NPC(AnimatedSprite):
+    bleeds = True
+
     def __init__(self, world, kind, pos):
         d = NPC_DEFS[kind]
         self.kind = kind
@@ -79,8 +81,8 @@ class NPC(AnimatedSprite):
     def is_alive(self):
         return self.state not in ('dying', 'dead')
 
-    def set_anim(self, name, loop=True, frame_time=None):
-        if self.anim_name == name:
+    def set_anim(self, name, loop=True, frame_time=None, restart=False):
+        if self.anim_name == name and not restart:
             return
         self.anim_name = name
         self.anim = Animation(self.anims[name], frame_time or self.defn['frame_time'], loop)
@@ -91,7 +93,6 @@ class NPC(AnimatedSprite):
         if not player.alive:
             self.sees_player = False
             return
-        self.dist = math.hypot(player.x - self.x, player.y - self.y)
         if self.dist > self.defn['sight']:
             self.sees_player = False
             return
@@ -113,12 +114,12 @@ class NPC(AnimatedSprite):
                 self.state = 'dead'
             return
         self.cooldown -= dt
+        player = self.world.player
+        self.dist = math.hypot(player.x - self.x, player.y - self.y)
         self.los_timer += dt
         if self.los_timer >= 100:
             self.los_timer = 0
             self.check_sight()
-        player = self.world.player
-        self.dist = math.hypot(player.x - self.x, player.y - self.y)
 
         if self.state == 'pain':
             if self.anim.done:
@@ -159,8 +160,7 @@ class NPC(AnimatedSprite):
     def start_attack(self):
         self.state = 'attack'
         self.attack_fired = False
-        self.anim_name = None
-        self.set_anim('attack', loop=False, frame_time=self.defn['attack_frame_time'])
+        self.set_anim('attack', loop=False, frame_time=self.defn['attack_frame_time'], restart=True)
 
     def perform_attack(self):
         world = self.world
@@ -193,7 +193,7 @@ class NPC(AnimatedSprite):
                                damage=random.randint(*d['damage']) * mult, z=0.55)
         elif kind == 'melee':
             world.audio.play('npc_attack', pos=self.pos)
-            if self.dist <= d['range'] + 0.3:
+            if self.dist <= d['range'] + 0.3 and line_of_sight(world, self.x, self.y, player.x, player.y):
                 player.get_damage(random.randint(*d['damage']) * mult, source=self)
 
     # ------------------------------------------------------------ movement
@@ -223,10 +223,10 @@ class NPC(AnimatedSprite):
         dy = math.sin(angle) * step
         if self.defn['attack'] == 'melee' and self.dist < 0.9:
             return
-        blocked = world.circle_blocked
-        if not blocked(self.x + dx, self.y, self.radius):
+        step_blocked = world.step_blocked
+        if not step_blocked(self.x, self.y, self.x + dx, self.y, self.radius):
             self.x += dx
-        if not blocked(self.x, self.y + dy, self.radius):
+        if not step_blocked(self.x, self.y, self.x, self.y + dy, self.radius):
             self.y += dy
 
     # ------------------------------------------------------------ damage
@@ -241,13 +241,11 @@ class NPC(AnimatedSprite):
         self.world.audio.play('npc_pain', pos=self.pos)
         if random.random() < self.defn['pain_chance']:
             self.state = 'pain'
-            self.anim_name = None
-            self.set_anim('pain', loop=False, frame_time=110)
+            self.set_anim('pain', loop=False, frame_time=110, restart=True)
 
     def die(self):
         self.state = 'dying'
-        self.anim_name = None
-        self.set_anim('death', loop=False, frame_time=100)
+        self.set_anim('death', loop=False, frame_time=100, restart=True)
         self.world.audio.play('npc_death', pos=self.pos)
         self.world.on_kill(self)
 
@@ -263,8 +261,7 @@ class NPC(AnimatedSprite):
         self.alerted = bool(state.get('alerted', False))
         if not state.get('alive', True):
             self.state = 'dead'
-            self.anim_name = None
-            self.set_anim('death', loop=False, frame_time=100)
+            self.set_anim('death', loop=False, frame_time=100, restart=True)
             self.anim.index = len(self.anim.frames) - 1
             self.anim.done = True
             self.image = self.anim.image

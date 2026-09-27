@@ -69,8 +69,7 @@ PROP_DEFS = {
 class Pickup(AnimatedSprite):
     def __init__(self, world, kind, pos, index=0):
         d = PICKUP_DEFS[kind]
-        assets = world.game.assets
-        frames = assets.frames(d['frames']) if 'frames' in d else [assets.frame(d['image'])]
+        frames = world.game.assets.sprite_frames(d)
         super().__init__(world, frames, pos, d['scale'], d.get('z', 0.0), d.get('frame_time', 150))
         self.kind = kind
         self.index = index
@@ -109,8 +108,7 @@ class Pickup(AnimatedSprite):
 class Prop(AnimatedSprite):
     def __init__(self, world, kind, pos):
         d = PROP_DEFS[kind]
-        assets = world.game.assets
-        frames = assets.frames(d['frames']) if 'frames' in d else [assets.frame(d['image'])]
+        frames = world.game.assets.sprite_frames(d)
         super().__init__(world, frames, pos, d['scale'], d.get('z', 0.0), d.get('frame_time', 150))
         self.kind = kind
         self.defn = d
@@ -155,6 +153,7 @@ class Barrel(Prop):
         self.alive = False
         world = self.world
         world.solid_tiles.discard(self.map_pos)
+        world.pathfinding.refresh_tile(self.map_pos)
         world.objects.spawn_explosion(self.pos, 0.25, 0.95)
         world.audio.play('barrel_explode', pos=self.pos)
         world.splash_damage(self.x, self.y, 1.9, 90, source=self)
