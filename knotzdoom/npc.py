@@ -223,19 +223,11 @@ class NPC(AnimatedSprite):
         dy = math.sin(angle) * step
         if self.defn['attack'] == 'melee' and self.dist < 0.9:
             return
-        if not self.collides(self.x + dx, self.y):
+        blocked = world.circle_blocked
+        if not blocked(self.x + dx, self.y, self.radius):
             self.x += dx
-        if not self.collides(self.x, self.y + dy):
+        if not blocked(self.x, self.y + dy, self.radius):
             self.y += dy
-
-    def collides(self, x, y):
-        blocks = self.world.blocks_movement
-        r = self.radius
-        for cx in (x - r, x + r):
-            for cy in (y - r, y + r):
-                if blocks((int(cx), int(cy))):
-                    return True
-        return False
 
     # ------------------------------------------------------------ damage
     def take_damage(self, amount, source=None):

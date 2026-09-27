@@ -35,6 +35,27 @@ AMMO_PICKUPS = {'clip': ('bullets', 10), 'bullet_box': ('bullets', 50), 'shells'
 WEAPON_PICKUPS = {'shotgun', 'chaingun', 'rocket_launcher'}
 KEY_PICKUPS = {'key_red': 'red', 'key_blue': 'blue', 'key_yellow': 'yellow'}
 
+
+def _give_weapon(player, kind):
+    """A weapon is picked up when it is new or when it still adds ammo."""
+    ammo_type = WEAPON_DEFS[kind]['ammo']
+    before = player.ammo[ammo_type]
+    return player.give_weapon(kind) or player.ammo[ammo_type] > before
+
+
+# kind -> callable(player, kind) returning True when the item was consumed
+PICKUP_EFFECTS = {
+    'stimpack': lambda p, k: p.give_health(10),
+    'medikit': lambda p, k: p.give_health(25),
+    'soulsphere': lambda p, k: p.give_health(100, limit=200),
+    'armor_green': lambda p, k: p.give_armor(100, 1),
+    'armor_blue': lambda p, k: p.give_armor(200, 2),
+    'backpack': lambda p, k: p.give_backpack(),
+}
+PICKUP_EFFECTS.update({k: (lambda p, kind: p.give_ammo(*AMMO_PICKUPS[kind])) for k in AMMO_PICKUPS})
+PICKUP_EFFECTS.update({k: _give_weapon for k in WEAPON_PICKUPS})
+PICKUP_EFFECTS.update({k: (lambda p, kind: p.give_key(KEY_PICKUPS[kind])) for k in KEY_PICKUPS})
+
 PROP_DEFS = {
     'barrel':      {'frames': 'decorations/barrel', 'scale': 0.55, 'frame_time': 260, 'solid': True, 'radius': 0.35},
     'pillar':      {'image': 'decorations/pillar.png', 'scale': 1.0, 'solid': True, 'radius': 0.35},
@@ -81,30 +102,8 @@ class Pickup(AnimatedSprite):
         player.score += 10
 
     def apply(self, player):
-        kind = self.kind
-        if kind == 'stimpack':
-            return player.give_health(10)
-        if kind == 'medikit':
-            return player.give_health(25)
-        if kind == 'soulsphere':
-            return player.give_health(100, limit=200)
-        if kind == 'armor_green':
-            return player.give_armor(100, 1)
-        if kind == 'armor_blue':
-            return player.give_armor(200, 2)
-        if kind in AMMO_PICKUPS:
-            ammo_type, amount = AMMO_PICKUPS[kind]
-            return player.give_ammo(ammo_type, amount)
-        if kind in WEAPON_PICKUPS:
-            ammo_type = WEAPON_DEFS[kind]['ammo']
-            before = player.ammo[ammo_type]
-            was_new = player.give_weapon(kind)
-            return was_new or player.ammo[ammo_type] > before
-        if kind in KEY_PICKUPS:
-            return player.give_key(KEY_PICKUPS[kind])
-        if kind == 'backpack':
-            return player.give_backpack()
-        return False
+        effect = PICKUP_EFFECTS.get(self.kind)
+        return bool(effect and effect(player, self.kind))
 
 
 class Prop(AnimatedSprite):

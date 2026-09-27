@@ -154,6 +154,13 @@ class World:
         x, y = tile
         return not (0 <= x < self.level.cols and 0 <= y < self.level.rows)
 
+    def circle_blocked(self, x, y, radius):
+        """True when a circle of ``radius`` at (x, y) overlaps a blocking tile."""
+        blocks = self.blocks_movement
+        x0, x1 = int(x - radius), int(x + radius)
+        y0, y1 = int(y - radius), int(y + radius)
+        return (blocks((x0, y0)) or blocks((x1, y0)) or blocks((x0, y1)) or blocks((x1, y1)))
+
     def blocks_projectile(self, tile):
         if tile in self.walls:
             return True

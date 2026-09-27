@@ -238,22 +238,16 @@ class Player:
         self.angle %= math.tau
 
     def try_move(self, dx, dy):
+        """Move with wall sliding: each axis is tried separately."""
         if self.noclip:
             self.x += dx
             self.y += dy
             return
-        if not self.collides(self.x + dx, self.y):
+        blocked = self.world.circle_blocked
+        if not blocked(self.x + dx, self.y, PLAYER_RADIUS):
             self.x += dx
-        if not self.collides(self.x, self.y + dy):
+        if not blocked(self.x, self.y + dy, PLAYER_RADIUS):
             self.y += dy
-
-    def collides(self, x, y, radius=PLAYER_RADIUS):
-        blocks = self.world.blocks_movement
-        for cx in (x - radius, x + radius):
-            for cy in (y - radius, y + radius):
-                if blocks((int(cx), int(cy))):
-                    return True
-        return False
 
     def mouse_control(self, dt):
         if self.game.mouse_grabbed:
