@@ -13,6 +13,7 @@ from .config import Config
 from .fonts import Fonts
 from .level import load_episode, load_level
 from .settings import BASE_DIR, DIFFICULTIES, RES, TITLE
+from .view import DetailController
 
 RECORDS_PATH = os.path.join(BASE_DIR, 'records.json')
 SCREENSHOT_DIR = os.path.join(BASE_DIR, 'screenshots')
@@ -25,6 +26,7 @@ class Game:
         self.headless = headless
         self.version = __version__
         self.config = Config()
+        self.detail = DetailController(self.config)
         self.set_window_icon()
         self.screen = self.make_screen()
         pg.display.set_caption(TITLE)
@@ -311,6 +313,7 @@ class Game:
         if dt is None:
             cap = int(self.config['fps_cap'])
             dt = self.clock.tick(cap) if cap else self.clock.tick()
+            self.detail.record_frame(self.clock.get_rawtime())
         dt = min(dt, 60)                # never let a hitch teleport things through walls
         self.delta_time = dt
         self.check_events()

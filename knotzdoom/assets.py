@@ -151,13 +151,13 @@ class Assets:
         return bank[level]
 
     # ------------------------------------------------------------ sky
-    def sky(self, name='sky'):
-        if name in self.sky_cache:
-            return self.sky_cache[name]
+    def sky(self, name='sky', size=(WIDTH, HALF_HEIGHT)):
+        key = (name, tuple(size))
+        if key in self.sky_cache:
+            return self.sky_cache[key]
         path = os.path.join(TEX_DIR, name if name.endswith('.png') else name + '.png')
-        img = self.load_image(path, alpha=False)
-        img = pg.transform.smoothscale(img, (WIDTH, HALF_HEIGHT))
-        self.sky_cache[name] = img
+        img = pg.transform.smoothscale(self.load_image(path, alpha=False), size)
+        self.sky_cache[key] = img
         return img
 
     # ------------------------------------------------------------ digits

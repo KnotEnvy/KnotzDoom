@@ -15,6 +15,7 @@ DEFAULTS = {
     'fullscreen': False,
     'head_bob': True,
     'fps_cap': 60,
+    'detail': 'auto',             # 'auto' | 'high' | 'low' (3D view resolution)
 }
 
 

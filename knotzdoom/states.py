@@ -208,6 +208,7 @@ class DemoBackground:
             screen.fill((12, 8, 8))
             return
         self.renderer.render(self.cam)
+        self.renderer.present()
         draw_dim(screen, 120)
 
 
@@ -336,6 +337,11 @@ class OptionsState(State):
             idx = caps.index(cfg['fps_cap']) if cfg['fps_cap'] in caps else 1
             cfg['fps_cap'] = caps[(idx + direction) % len(caps)]
 
+        def detail_adjust(direction):
+            from .view import DETAIL_ORDER
+            idx = DETAIL_ORDER.index(cfg['detail']) if cfg['detail'] in DETAIL_ORDER else 0
+            cfg['detail'] = DETAIL_ORDER[(idx + direction) % len(DETAIL_ORDER)]
+
         bar = lambda v: '[' + '#' * int(round(v * 10)) + '-' * (10 - int(round(v * 10))) + ']'
         self.menu = Menu(game, [
             slider('music_volume', 0.1, 0.0, 1.0, bar),
@@ -348,8 +354,10 @@ class OptionsState(State):
             toggle('show_fps'),
             toggle('fullscreen'),
             MenuItem('FPS CAP', value=lambda: 'UNLIMITED' if not cfg['fps_cap'] else str(cfg['fps_cap']), adjust=fps_adjust),
+            MenuItem('DETAIL', value=lambda: str(cfg['detail']).upper(), adjust=detail_adjust,
+                     hint='AUTO drops to low detail when frames get slow, like the original.'),
             MenuItem('BACK', self.back),
-        ], top=190, spacing=52, font=game.fonts.small_big, x=HALF_WIDTH - 120, align='right')
+        ], top=170, spacing=50, font=game.fonts.small_big, x=HALF_WIDTH - 120, align='right')
 
     def back(self):
         self.game.config.save()
@@ -653,22 +661,24 @@ class PlayState(State):
         world = self.world
         player = world.player
         cfg = self.game.config
-        self.renderer.render(player)
+        renderer = self.renderer
+        renderer.render(player)
         if player.weapon is not None:
             bob_x = math.sin(player.bob_phase) * 9 * player.bob_amount
             bob_y = abs(math.cos(player.bob_phase)) * 7 * player.bob_amount
             if not player.alive:
                 bob_y = 80 * min(1.0, player.death_timer / 600.0)
-            player.weapon.draw(screen, bob_x, bob_y, player.switch_progress)
+            player.weapon.draw(renderer.view, bob_x, bob_y, player.switch_progress)
         if cfg['screen_shake'] and world.fx.shake > 0:
-            amount = int(world.fx.shake)
-            self.renderer.shake(random.randint(-amount, amount), random.randint(-amount, amount))
+            amount = max(1, int(world.fx.shake) // renderer.view.divisor)
+            renderer.shake(random.randint(-amount, amount), random.randint(-amount, amount))
         if world.fx.damage_flash > 0:
-            self.renderer.overlay((255, 0, 0), world.fx.damage_flash)
+            renderer.overlay((255, 0, 0), world.fx.damage_flash)
         if world.fx.bonus_flash > 0:
-            self.renderer.overlay((255, 230, 60), world.fx.bonus_flash * 0.5)
+            renderer.overlay((255, 230, 60), world.fx.bonus_flash * 0.5)
         if not player.alive:
-            self.renderer.overlay((120, 0, 0), min(160, player.death_timer * 0.12))
+            renderer.overlay((120, 0, 0), min(160, player.death_timer * 0.12))
+        renderer.present()
         self.hud.draw_status_bar(screen, world)
         if self.hud.automap:
             self.hud.draw_automap(screen, world)
@@ -685,7 +695,7 @@ class PlayState(State):
         if cfg['show_fps']:
             self.hud.draw_fps(screen, self.game.clock.get_fps())
         if self.fade > 0:
-            self.renderer.overlay((0, 0, 0), 255 * self.fade / 700.0)
+            self.renderer.screen_overlay((0, 0, 0), 255 * self.fade / 700.0)
 
 
 # ------------------------------------------------------------------ pause

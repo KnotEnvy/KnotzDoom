@@ -3,8 +3,15 @@ import math
 
 import numpy as np
 
+import pygame as pg
+
 from knotzdoom.raycasting import RayCaster, cast_single_ray, line_of_sight
-from knotzdoom.settings import HALF_NUM_RAYS
+from knotzdoom.settings import HALF_NUM_RAYS, RES
+from knotzdoom.view import View
+
+
+def make_caster(world, divisor=1):
+    return RayCaster(world, View(pg.Surface(RES), divisor))
 
 
 class FakeDoor:
@@ -40,7 +47,7 @@ class Cam:
 
 
 def center_depth(world, cam):
-    caster = RayCaster(world)
+    caster = make_caster(world)
     caster.cast(cam)
     return float(caster.depth[HALF_NUM_RAYS]), caster.results[HALF_NUM_RAYS]
 
@@ -64,7 +71,7 @@ def test_half_open_door_reveals_half_the_doorway():
     # camera looking through the doorway from an angle: rays hitting the part
     # of the slab that slid away pass through, the rest is blocked.
     world = FakeWorld(door_open=0.5)
-    caster = RayCaster(world)
+    caster = make_caster(world)
     caster.cast(Cam(5.0, 3.5, 0.0))
     depths = caster.depth
     assert depths.min() < 2.0               # some rays hit the slab (x = 6.5)
@@ -80,10 +87,21 @@ def test_walls_are_hit_correctly():
 
 def test_depth_buffer_is_finite_everywhere():
     world = FakeWorld()
-    caster = RayCaster(world)
+    caster = make_caster(world)
     caster.cast(Cam(2.5, 2.5, 0.7))
     assert np.all(np.isfinite(caster.depth))
     assert caster.depth.min() > 0
+
+
+def test_low_detail_casts_half_the_rays_with_the_same_geometry():
+    world = FakeWorld(door_open=0.0)
+    high = make_caster(world, 1)
+    low = make_caster(world, 2)
+    cam = Cam(2.5, 3.5, 0.0)
+    high.cast(cam)
+    low.cast(cam)
+    assert len(low.results) == len(high.results) // 2
+    assert abs(float(low.depth[len(low.depth) // 2]) - float(high.depth[len(high.depth) // 2])) < 0.02
 
 
 def test_single_ray_and_line_of_sight():

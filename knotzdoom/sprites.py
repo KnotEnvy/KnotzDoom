@@ -9,7 +9,6 @@ import math
 
 import pygame as pg
 
-from .settings import (DELTA_ANGLE, HALF_HEIGHT, HALF_NUM_RAYS, SCALE, SCREEN_DIST, WIDTH)
 
 
 class Animation:
@@ -81,6 +80,7 @@ class SpriteObject:
         return int(self.x), int(self.y)
 
     def project(self, cam, renderer):
+        """Compute the on-screen placement (in view pixels) and queue a draw."""
         dx = self.x - cam.x
         dy = self.y - cam.y
         self.theta = math.atan2(dy, dx)
@@ -90,17 +90,18 @@ class SpriteObject:
         self.on_screen = False
         if self.norm_dist < 0.2:
             return
+        view = renderer.view
         image = self.image
         iw, ih = image.get_size()
-        proj = SCREEN_DIST / self.norm_dist
+        proj = view.screen_dist / self.norm_dist
         height = proj * self.scale
         width = height * iw / ih
-        self.screen_x = (HALF_NUM_RAYS + delta / DELTA_ANGLE) * SCALE
+        self.screen_x = (view.half_num_rays + delta / view.delta_angle) * view.column
         self.half_width = width / 2
         left = self.screen_x - self.half_width
-        if left + width < 0 or left > WIDTH or height < 1:
+        if left + width < 0 or left > view.width or height < 1:
             return
-        floor_y = HALF_HEIGHT + proj * cam.cam_h
+        floor_y = view.half_height + proj * cam.cam_h
         bottom = floor_y - proj * self.z
         top = bottom - height
         self.on_screen = True

@@ -4,7 +4,7 @@ import random
 
 import pygame as pg
 
-from .settings import HALF_WIDTH, HEIGHT, STATUS_BAR_HEIGHT
+from .settings import HEIGHT, STATUS_BAR_HEIGHT
 
 WEAPON_DEFS = {
     'pistol': {
@@ -43,6 +43,7 @@ class Weapon:
         d = WEAPON_DEFS[name]
         self.defn = d
         self.frames = self.load_frames(name, d)
+        self.frame_sets = {1: self.frames}       # frames scaled per view divisor
         self.frame = 0
         self.sequence = list(range(1, len(self.frames)))
         self.seq_index = -1
@@ -112,9 +113,20 @@ class Weapon:
             world.fx.shake = max(world.fx.shake, 4)
 
     # ------------------------------------------------------------ drawing
-    def draw(self, screen, bob_x=0.0, bob_y=0.0, lower=0.0):
-        image = self.frames[self.frame]
+    def frames_for(self, divisor):
+        frames = self.frame_sets.get(divisor)
+        if frames is None:
+            frames = [pg.transform.smoothscale(img, (max(1, img.get_width() // divisor),
+                                                     max(1, img.get_height() // divisor)))
+                      for img in self.frames]
+            self.frame_sets[divisor] = frames
+        return frames
+
+    def draw(self, view, bob_x=0.0, bob_y=0.0, lower=0.0):
+        """Draw the weapon into the 3D view (offsets are given in window pixels)."""
+        d = view.divisor
+        image = self.frames_for(d)[self.frame]
         w, h = image.get_size()
-        x = HALF_WIDTH - w // 2 + int(bob_x)
-        y = HEIGHT - h - STATUS_BAR_HEIGHT + 30 + int(bob_y + self.kick + lower * (h + 40))
-        screen.blit(image, (x, y))
+        x = view.half_width - w // 2 + int(bob_x / d)
+        y = view.height - h + (30 - STATUS_BAR_HEIGHT) // d + int((bob_y + self.kick) / d + lower * (h + 40 // d))
+        view.surface.blit(image, (x, y))

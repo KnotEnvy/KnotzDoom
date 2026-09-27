@@ -6,8 +6,7 @@ from .level import ENEMY_KINDS
 from .objects import ObjectHandler
 from .pathfinding import PathFinding
 from .player import Player
-from .settings import (DELTA_ANGLE, DIFFICULTIES, DOOR_OPEN_TIME, DOOR_PASSABLE, DOOR_STAY_OPEN,
-                       HALF_NUM_RAYS, NUM_RAYS, SCALE)
+from .settings import DIFFICULTIES, DOOR_OPEN_TIME, DOOR_PASSABLE, DOOR_STAY_OPEN
 
 
 class Effects:
@@ -246,14 +245,17 @@ class World:
         """Fire ``pellets`` hitscan rays from the player around its view direction."""
         player = self.player
         renderer = self.renderer
-        depth = renderer.raycaster.depth if renderer is not None else None
+        if renderer is None:
+            return
+        view = renderer.view
+        depth = renderer.raycaster.depth
         targets = [t for t in self.objects.shootable() if t.on_screen]
         for _ in range(pellets):
             offset = random.uniform(-spread, spread) if spread else 0.0
-            col = int(HALF_NUM_RAYS + offset / DELTA_ANGLE)
-            col = max(0, min(NUM_RAYS - 1, col))
-            px = col * SCALE + SCALE / 2
-            wall_depth = float(depth[col]) if depth is not None else 100.0
+            col = int(view.half_num_rays + offset / view.delta_angle)
+            col = max(0, min(view.num_rays - 1, col))
+            px = col * view.column + view.column / 2
+            wall_depth = float(depth[col])
             best = None
             for target in targets:
                 if abs(target.screen_x - px) <= target.half_width * 0.85 and target.norm_dist < wall_depth:

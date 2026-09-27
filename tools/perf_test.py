@@ -12,8 +12,9 @@ from knotzdoom.game import Game  # noqa: E402
 from knotzdoom.states import PlayState  # noqa: E402
 
 
-def main(level_index=0, frames=240):
+def main(level_index=0, frames=240, detail='high'):
     game = Game(headless=True)
+    game.config['detail'] = detail
     game.session = {'difficulty': 1, 'results': [], 'deaths': 0, 'carry': None}
     game.start_level(level_index, 1)
     play = game.state
@@ -47,10 +48,11 @@ def main(level_index=0, frames=240):
         timings['sprites'] += t4 - t3
         timings['hud'] += t5 - t4
         timings['total'] += t5 - t0
+    print(f'level {level_index} detail={detail} ({renderer.view.width}x{renderer.view.height}, {renderer.view.num_rays} rays)')
     for key, value in timings.items():
         print(f'{key:8s} {1000 * value / frames:6.2f} ms/frame')
     print(f'~{frames / timings["total"]:.0f} fps (render+update only)')
 
 
 if __name__ == '__main__':
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 0)
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 0, detail=sys.argv[2] if len(sys.argv) > 2 else 'high')

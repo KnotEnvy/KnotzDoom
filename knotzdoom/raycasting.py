@@ -14,15 +14,15 @@ import math
 
 import numpy as np
 
-from .settings import (DELTA_ANGLE, HALF_FOV, MAX_DEPTH, MAX_PROJ_HEIGHT, NUM_RAYS,
-                       SCREEN_DIST)
+from .settings import HALF_FOV, MAX_DEPTH
 
 
 class RayCaster:
-    def __init__(self, world):
+    def __init__(self, world, view):
         self.world = world
-        self.results = [(MAX_DEPTH, 1.0, 1, 0.0, False)] * NUM_RAYS
-        self.depth = np.full(NUM_RAYS, float(MAX_DEPTH), dtype=np.float32)
+        self.view = view
+        self.results = [(MAX_DEPTH, 1.0, 1, 0.0, False)] * view.num_rays
+        self.depth = np.full(view.num_rays, float(MAX_DEPTH), dtype=np.float32)
 
     def cast(self, cam):
         walls = self.world.walls
@@ -31,15 +31,23 @@ class RayCaster:
         seen = self.world.seen_tiles
         results = self.results
         depth_buf = self.depth
+        view = self.view
+        num_rays = view.num_rays
+        delta_angle = view.delta_angle
+        screen_dist = view.screen_dist
+        max_proj_height = view.max_proj_height
+        sin = math.sin
+        cos = math.cos
+        inf = float('inf')
 
         ox, oy = cam.x, cam.y
         x_map, y_map = int(ox), int(oy)
         ray_angle = cam.angle - HALF_FOV + 0.0001
         cam_angle = cam.angle
 
-        for ray in range(NUM_RAYS):
-            sin_a = math.sin(ray_angle)
-            cos_a = math.cos(ray_angle)
+        for ray in range(num_rays):
+            sin_a = sin(ray_angle)
+            cos_a = cos(ray_angle)
             if sin_a == 0:
                 sin_a = 1e-9
             if cos_a == 0:
@@ -80,7 +88,7 @@ class RayCaster:
                 y_hor += dy
                 depth_hor += delta_depth
             else:
-                depth_hor = float('inf')
+                depth_hor = inf
 
             # ---------------------------------------------- vertical grid lines
             texture_vert = 1
@@ -117,7 +125,7 @@ class RayCaster:
                 y_vert += dy
                 depth_vert += delta_depth
             else:
-                depth_vert = float('inf')
+                depth_vert = inf
 
             # ---------------------------------------------- nearest hit
             if depth_vert < depth_hor:
@@ -126,20 +134,20 @@ class RayCaster:
                 depth, texture, offset, vertical, tile = depth_hor, texture_hor, offset_hor, False, hit_tile_hor
             if tile is not None:
                 seen.add(tile)
-            if depth == float('inf'):
+            if depth == inf:
                 depth = MAX_DEPTH
 
             # remove the fishbowl effect
-            depth *= math.cos(cam_angle - ray_angle)
+            depth *= cos(cam_angle - ray_angle)
             if depth < 1e-4:
                 depth = 1e-4
-            proj_height = SCREEN_DIST / depth
-            if proj_height > MAX_PROJ_HEIGHT:
-                proj_height = MAX_PROJ_HEIGHT
+            proj_height = screen_dist / depth
+            if proj_height > max_proj_height:
+                proj_height = max_proj_height
 
             results[ray] = (depth, proj_height, texture, offset, vertical)
             depth_buf[ray] = depth
-            ray_angle += DELTA_ANGLE
+            ray_angle += delta_angle
 
 
 def cast_single_ray(world, ox, oy, angle, max_depth=MAX_DEPTH, door_open_threshold=0.5):
