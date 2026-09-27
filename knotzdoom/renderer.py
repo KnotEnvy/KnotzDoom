@@ -22,18 +22,19 @@ SHADE_CACHE_SIZE = 160          # shaded sprite sources kept (LRU)
 
 
 class Renderer:
-    def __init__(self, game, world):
+    def __init__(self, game, world, divisor=None):
         self.game = game
         self.screen = game.screen
         self.assets = game.assets
         self.world = world
+        self.fixed_divisor = divisor         # None: follow the detail setting
         self.light = 0                       # extra brightness levels (muzzle flash)
         self._overlay_cache = {}
         self._shade_cache = OrderedDict()
         self._shaded_keys = {}
         self.sprite_requests = []
         self.view = None
-        self.set_detail(game.detail.divisor)
+        self.set_detail(divisor or game.detail.divisor)
 
     # ------------------------------------------------------------ setup
     def set_detail(self, divisor):
@@ -59,7 +60,7 @@ class Renderer:
 
     # ------------------------------------------------------------ frame
     def render(self, cam):
-        self.set_detail(self.game.detail.divisor)
+        self.set_detail(self.fixed_divisor or self.game.detail.divisor)
         self.raycaster.cast(cam)
         self.draw_background(cam)
         self.draw_walls(cam)

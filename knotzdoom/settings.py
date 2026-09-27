@@ -14,8 +14,12 @@ SPRITE_DIR = os.path.join(RES_DIR, 'sprites')
 SOUND_DIR = os.path.join(RES_DIR, 'sound')
 MUSIC_DIR = os.path.join(RES_DIR, 'music')
 LEVEL_DIR = os.path.join(BASE_DIR, 'levels')
-SAVE_DIR = os.path.join(BASE_DIR, 'saves')
-CONFIG_PATH = os.path.join(BASE_DIR, 'config.json')
+# user data (saves, options, records) lives next to the game unless KNOTZDOOM_DATA_DIR says otherwise
+DATA_DIR = os.environ.get('KNOTZDOOM_DATA_DIR', BASE_DIR)
+SAVE_DIR = os.path.join(DATA_DIR, 'saves')
+CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
+RECORDS_PATH = os.path.join(DATA_DIR, 'records.json')
+SCREENSHOT_DIR = os.path.join(BASE_DIR, 'screenshots')
 
 # ---------------------------------------------------------------- display
 RES = WIDTH, HEIGHT = 1600, 900

@@ -12,6 +12,7 @@ import random
 import pygame as pg
 
 from . import saves
+from .fonts import format_time
 from .settings import DIFFICULTIES, HALF_HEIGHT, HALF_WIDTH, HEIGHT, WIDTH
 from .world import World
 
@@ -19,9 +20,18 @@ CHEATS = ('iddqd', 'idkfa', 'idclip', 'iddt')
 MAX_CHEAT_LEN = 8
 
 
+_dim_cache = {}
+
+
 def draw_dim(screen, alpha=150):
-    dim = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
-    dim.fill((0, 0, 0, alpha))
+    """Dim the whole screen with a cached translucent surface."""
+    size = screen.get_size()
+    key = (size, int(alpha))
+    dim = _dim_cache.get(key)
+    if dim is None:
+        dim = pg.Surface(size, pg.SRCALPHA)
+        dim.fill((0, 0, 0, int(alpha)))
+        _dim_cache[key] = dim
     screen.blit(dim, (0, 0))
 
 
@@ -179,16 +189,11 @@ class DemoBackground:
             from .renderer import Renderer
             level = game.level_data(0)
             self.world = World(game, level, difficulty_index=1)
-            self.renderer = Renderer(game, self.world)
+            self.renderer = Renderer(game, self.world, divisor=2)   # menus never need full detail
             self.cam = self.world.player
-            self.cam.x, self.cam.y = self.pick_camera_spot(level)
         except Exception as exc:      # the menus must work even without levels
             print('demo background unavailable:', exc)
             self.world = None
-
-    def pick_camera_spot(self, level):
-        sx, sy = level.player_start
-        return sx, sy
 
     def update(self, dt):
         if self.world is None:
@@ -247,7 +252,7 @@ class TitleState(State):
 class MainMenuState(State):
     def __init__(self, game):
         super().__init__(game)
-        has_saves = any(s is not None for s in saves.slot_summaries())
+        has_saves = any(s is not None and 'problem' not in s for s in saves.slot_summaries(game.level_count))
         self.menu = Menu(game, [
             MenuItem('NEW GAME', lambda: game.push(DifficultyState(game))),
             MenuItem('LOAD GAME', lambda: game.push(SaveLoadState(game, 'load')), enabled=has_saves),
@@ -263,7 +268,7 @@ class MainMenuState(State):
 
     def resume(self):
         self.enter()
-        has_saves = any(s is not None for s in saves.slot_summaries())
+        has_saves = any(s is not None and 'problem' not in s for s in saves.slot_summaries(self.game.level_count))
         self.menu.items[1].enabled = has_saves
 
     def handle_event(self, event):
@@ -698,8 +703,6 @@ class PlayState(State):
 
 # ------------------------------------------------------------------ pause
 class PauseState(State):
-    transparent = True
-
     def __init__(self, game, play):
         super().__init__(game)
         self.play = play
@@ -717,6 +720,7 @@ class PauseState(State):
         self.game.set_mouse_grab(False)
         self.game.audio.pause_music()
         self.snapshot = self.game.screen.copy()
+        draw_dim(self.snapshot, 150)
 
     def exit(self):
         self.game.audio.resume_music()
@@ -746,9 +750,7 @@ class PauseState(State):
         self.menu.update(dt)
 
     def draw(self, screen):
-        if self.snapshot is not None:
-            screen.blit(self.snapshot, (0, 0))
-        draw_dim(screen, 150)
+        screen.blit(self.snapshot, (0, 0))
         self.game.fonts.heading.draw(screen, 'PAUSED', HALF_WIDTH, 120)
         self.menu.draw(screen)
 
@@ -765,15 +767,19 @@ class SaveLoadState(State):
     def build_menu(self):
         game = self.game
         items = []
-        for slot, summary in enumerate(saves.slot_summaries()):
+        for slot, summary in enumerate(saves.slot_summaries(game.level_count)):
+            hint = None
             if summary is None:
                 label = f'SLOT {slot + 1}: EMPTY'
+                enabled = self.mode == 'save'
+            elif 'problem' in summary:
+                label = f'SLOT {slot + 1}: ' + ('INCOMPATIBLE' if summary['problem'] == 'incompatible' else 'DAMAGED')
                 enabled = self.mode == 'save'
             else:
                 label = f'SLOT {slot + 1}: {summary["level_name"].upper()}'
                 enabled = True
-            items.append(MenuItem(label, (lambda s=slot: self.choose(s)), enabled=enabled,
-                                  hint=None if summary is None else f'{summary["difficulty"]}  -  {summary["date"]}'))
+                hint = f'{summary["difficulty"]}  -  {summary["date"]}'
+            items.append(MenuItem(label, (lambda s=slot: self.choose(s)), enabled=enabled, hint=hint))
         items.append(MenuItem('BACK', self.back))
         self.menu = Menu(game, items, top=HALF_HEIGHT - 110, spacing=58, font=game.fonts.small_big)
 
@@ -956,23 +962,19 @@ class IntermissionState(State):
                 fonts.pixel.draw(screen, 'PRESS ANY KEY TO CONTINUE', HALF_WIDTH, HEIGHT - 60, (255, 220, 120), align='center')
 
     def draw_digits(self, screen, text, x, y):
-        size = 48
-        if not hasattr(self, '_digits'):
-            self._digits = {k: pg.transform.smoothscale(v, (size, size)) for k, v in self.game.assets.digits.items()}
+        font = self.game.fonts.digit_font(48)
+        size = font.size
         cx = x - size * len(text) // 2
         for ch in text:
-            if ch.isdigit():
-                screen.blit(self._digits[ch], (cx, y - size // 2))
-            elif ch == '%':
-                screen.blit(self._digits['10'], (cx, y - size // 2))
+            if ch.isdigit() or ch == '%':
+                font.draw(screen, ch, cx, y - size // 2, align='left')
             else:
                 self.game.fonts.menu.draw(screen, ch, cx + size // 2, y, 'red', glow=False)
             cx += size
 
     @staticmethod
     def format_time(ms):
-        seconds = int(ms // 1000)
-        return f'{seconds // 60}:{seconds % 60:02d}'
+        return format_time(ms, pad_minutes=False)
 
 
 # ------------------------------------------------------------------ victory

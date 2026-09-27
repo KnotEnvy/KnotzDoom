@@ -209,11 +209,27 @@ class LevelData:
 
 
 # -------------------------------------------------------------------- loading
-def load_level(level_id):
+class LevelError(ValueError):
+    pass
+
+
+def load_level(level_id, validate=True):
     path = os.path.join(LEVEL_DIR, f'{level_id}.json')
-    with open(path, 'r', encoding='utf-8') as fh:
-        data = json.load(fh)
-    return LevelData(data, level_id)
+    try:
+        with open(path, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+    except OSError as exc:
+        raise LevelError(f'cannot read level {level_id!r}: {exc}') from exc
+    except ValueError as exc:
+        raise LevelError(f'level {level_id!r} is not valid JSON: {exc}') from exc
+    if not isinstance(data, dict) or 'grid' not in data:
+        raise LevelError(f'level {level_id!r} needs a "grid"')
+    level = LevelData(data, level_id)
+    if validate:
+        problems = validate_level(level)
+        if problems:
+            raise LevelError(f'level {level_id!r} is not playable: ' + '; '.join(problems[:5]))
+    return level
 
 
 def load_episode():

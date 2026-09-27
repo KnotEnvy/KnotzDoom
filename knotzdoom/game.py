@@ -12,11 +12,8 @@ from .audio import Audio
 from .config import Config
 from .fonts import Fonts
 from .level import load_episode, load_level
-from .settings import BASE_DIR, DIFFICULTIES, RES, TITLE
+from .settings import BASE_DIR, DIFFICULTIES, RECORDS_PATH, RES, SCREENSHOT_DIR, TITLE
 from .view import DetailController
-
-RECORDS_PATH = os.path.join(BASE_DIR, 'records.json')
-SCREENSHOT_DIR = os.path.join(BASE_DIR, 'screenshots')
 
 
 class Game:
@@ -32,9 +29,11 @@ class Game:
         pg.display.set_caption(TITLE)
         self.clock = pg.time.Clock()
         self.assets = Assets()
-        self.fonts = Fonts()
+        self.fonts = Fonts(self.assets.digits)
         self.audio = Audio(self.config)
         self.episode = load_episode()
+        for key in self.config.rejected:
+            print(f'config.json: ignored invalid option {key!r}')
         self.level_cache = {}
         self.records = self.load_records()
         self.session = {}
@@ -42,9 +41,19 @@ class Game:
         self.running = True
         self.mouse_grabbed = False
         self.injected_events = []
+        self._dims = {}
         from .states import DemoBackground, TitleState
         self.demo = DemoBackground(self)
         self.push(TitleState(self))
+        self.report_missing_assets()
+
+    def report_missing_assets(self):
+        """Missing files are drawn as magenta checkerboards; say so once."""
+        missing = sorted(set(self.assets.missing))
+        if missing:
+            print(f'WARNING: {len(missing)} asset(s) missing, drawn as placeholders:')
+            for path in missing:
+                print('   ', os.path.relpath(path, BASE_DIR))
 
     # ------------------------------------------------------------ levels
     def level_data(self, index):
@@ -62,9 +71,17 @@ class Game:
         try:
             with open(RECORDS_PATH, 'r', encoding='utf-8') as fh:
                 data = json.load(fh)
-            return data if isinstance(data, dict) else {}
         except (OSError, ValueError):
             return {}
+        if not isinstance(data, dict):
+            return {}
+        records = {}
+        for key in ('best_score', 'wins', 'deaths'):
+            try:
+                records[key] = max(0, int(data.get(key, 0)))
+            except (TypeError, ValueError):
+                records[key] = 0
+        return records
 
     def save_records(self):
         try:
@@ -183,32 +200,62 @@ class Game:
         payload = {
             'level_index': play.level_index,
             'level_name': world.level.name,
+            'level_hash': saves.level_fingerprint(world.level),
             'difficulty': world.difficulty_index,
             'difficulty_name': DIFFICULTIES[world.difficulty_index]['name'],
             'session': {k: v for k, v in self.session.items() if k != 'carry'},
             'carry': self.session.get('carry'),
             'world': world.save_state(),
         }
-        saves.write_save(slot, payload)
+        try:
+            saves.write_save(slot, payload)
+        except OSError as exc:
+            world.message(f'Could not save: {exc}')
+            self.audio.play('door_locked')
+            return False
         world.message('Game saved.' if slot else 'Quick save done.')
         self.audio.play('tally_done')
         return True
 
     def load_game(self, slot):
-        data = saves.read_save(slot)
+        data, problem = saves.read_save_status(slot, self.level_count)
         if data is None:
-            state = self.state
-            if hasattr(state, 'world'):
-                state.world.message('No saved game in that slot.')
+            self.notify({'empty': 'No saved game in that slot.',
+                         'incompatible': 'That save is from an older version of the game.',
+                         'corrupt': 'That save file is damaged.'}.get(problem, 'Cannot load that save.'))
+            self.audio.play('door_locked')
+            return False
+        level = self.level_data(data['level_index'])
+        if data.get('level_hash') not in (None, saves.level_fingerprint(level)):
+            self.notify('That save was made on a different version of the level.')
             self.audio.play('door_locked')
             return False
         self.session = dict(data.get('session', {}))
         self.session['carry'] = data.get('carry')
-        self.start_level(int(data['level_index']), int(data['difficulty']), data.get('carry'), restore=data['world'])
+        self.start_level(data['level_index'], data['difficulty'], data.get('carry'), restore=data['world'])
         self.state.world.message('Game loaded.')
         return True
 
+    def notify(self, text):
+        """Show a message in the game if a world is on screen, else print it."""
+        for state in reversed(self.states):
+            world = getattr(state, 'world', None)
+            if world is not None:
+                world.message(text)
+                return
+        print(text)
+
     # ------------------------------------------------------------ window
+    def dim_surface(self, size, alpha):
+        """A cached translucent black surface for dimming backdrops."""
+        key = (tuple(size), int(alpha))
+        surf = self._dims.get(key)
+        if surf is None:
+            surf = pg.Surface(size, pg.SRCALPHA)
+            surf.fill((0, 0, 0, int(alpha)))
+            self._dims[key] = surf
+        return surf
+
     def set_mouse_grab(self, grab):
         self.mouse_grabbed = grab
         if self.headless:

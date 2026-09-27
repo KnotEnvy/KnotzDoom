@@ -38,8 +38,12 @@ class Walkthrough:
         os.makedirs(out_dir, exist_ok=True)
         self.game = Game(headless=True)
         self.keys = FakeKeys()
+        self._real_get_pressed = pg.key.get_pressed
         pg.key.get_pressed = lambda: self.keys
         self.shots = []
+
+    def close(self):
+        pg.key.get_pressed = self._real_get_pressed
 
     def run_frames(self, n, dt=16):
         for _ in range(n):
@@ -177,10 +181,13 @@ class Walkthrough:
         print('missing assets:', len(g.assets.missing))
         for m in g.assets.missing[:20]:
             print('  ', m)
+        self.close()
         return self.shots
 
 
 if __name__ == '__main__':
+    import tempfile
+    os.environ.setdefault('KNOTZDOOM_DATA_DIR', tempfile.mkdtemp(prefix='knotzdoom-smoke-'))
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), '..', 'screenshots', 'smoke')
     shots = Walkthrough(out).play()
     print('\n'.join(shots))

@@ -4,7 +4,11 @@
 ``PixelFont`` renders small chunky text (messages, HUD labels, options).
 Both cache rendered surfaces because text is re-drawn every frame.
 """
+from collections import OrderedDict
+
 import pygame as pg
+
+CACHE_LIMIT = 512          # rendered strings kept per font (LRU)
 
 RED_TOP = (255, 120, 80)
 RED_MID = (235, 45, 30)
@@ -31,12 +35,14 @@ class BigFont:
         self.size = size
         self.font = pg.font.Font(None, size)
         self.font.set_bold(True)
-        self.cache = {}
+        self.cache = OrderedDict()
 
     def render(self, text, palette='red', glow=True):
         key = (text, palette, glow)
-        if key in self.cache:
-            return self.cache[key]
+        cached = self.cache.get(key)
+        if cached is not None:
+            self.cache.move_to_end(key)
+            return cached
         top, mid, bottom, glow_color = PALETTES[palette]
         outline = max(1, self.size // 24)
         pad = outline * 2 + (self.size // 6 if glow else 0)
@@ -65,6 +71,8 @@ class BigFont:
                     surf.blit(dark, (pad + dx, pad + dy))
         surf.blit(gradient, (pad, pad))
         self.cache[key] = surf
+        if len(self.cache) > CACHE_LIMIT:
+            self.cache.popitem(last=False)
         return surf
 
     def draw(self, screen, text, x, y, palette='red', align='center', glow=True):
@@ -86,12 +94,14 @@ class PixelFont:
     def __init__(self, size=18, scale=2):
         self.font = pg.font.Font(None, size)
         self.scale = scale
-        self.cache = {}
+        self.cache = OrderedDict()
 
     def render(self, text, color=(220, 220, 220), shadow=True):
         key = (text, color, shadow)
-        if key in self.cache:
-            return self.cache[key]
+        cached = self.cache.get(key)
+        if cached is not None:
+            self.cache.move_to_end(key)
+            return cached
         base = self.font.render(text, False, color).convert_alpha()
         w, h = base.get_size()
         if shadow:
@@ -103,6 +113,8 @@ class PixelFont:
             surf = base
         surf = pg.transform.scale(surf, (surf.get_width() * self.scale, surf.get_height() * self.scale))
         self.cache[key] = surf
+        if len(self.cache) > CACHE_LIMIT:
+            self.cache.popitem(last=False)
         return surf
 
     def draw(self, screen, text, x, y, color=(220, 220, 220), align='left', shadow=True):
@@ -121,11 +133,45 @@ class PixelFont:
         return self.font.get_height() * self.scale
 
 
+class DigitFont:
+    """The red glowing HUD digits ('0'-'9' and '%'), scaled once per size."""
+
+    def __init__(self, digits, size):
+        self.size = size
+        self.glyphs = {k: pg.transform.smoothscale(v, (size, size)) for k, v in digits.items()}
+
+    def width(self, text):
+        return self.size * len(text)
+
+    def draw(self, screen, text, x, y, align='right'):
+        """Draw digits; '%' uses the percent glyph. Returns the left edge."""
+        text = str(text)
+        start = x - self.width(text) if align == 'right' else x - self.width(text) // 2 if align == 'center' else x
+        for i, ch in enumerate(text):
+            glyph = self.glyphs.get('10' if ch == '%' else ch)
+            if glyph is not None:
+                screen.blit(glyph, (start + i * self.size, y))
+        return start
+
+
+def format_time(ms, pad_minutes=True):
+    seconds = int(ms // 1000)
+    return f'{seconds // 60:02d}:{seconds % 60:02d}' if pad_minutes else f'{seconds // 60}:{seconds % 60:02d}'
+
+
 class Fonts:
-    def __init__(self):
+    def __init__(self, digits=None):
         self.title = BigFont(150)
         self.heading = BigFont(72)
         self.menu = BigFont(54)
         self.small_big = BigFont(38)
         self.pixel = PixelFont(18, 2)
         self.pixel_large = PixelFont(24, 2)
+        self.digits = digits or {}
+        self._digit_fonts = {}
+
+    def digit_font(self, size):
+        font = self._digit_fonts.get(size)
+        if font is None:
+            font = self._digit_fonts[size] = DigitFont(self.digits, size)
+        return font

@@ -2,8 +2,12 @@
 import os
 import sys
 
+import tempfile
+
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+# never touch the player's real config / saves / records
+os.environ['KNOTZDOOM_DATA_DIR'] = tempfile.mkdtemp(prefix='knotzdoom-tests-')
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
