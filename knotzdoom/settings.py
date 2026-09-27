@@ -1,0 +1,77 @@
+"""Engine-wide constants.
+
+Everything that depends on the resolution is derived here so that the rest of
+the engine can simply ``from knotzdoom.settings import *``.
+"""
+import math
+import os
+
+# ---------------------------------------------------------------- paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RES_DIR = os.path.join(BASE_DIR, 'resources')
+TEX_DIR = os.path.join(RES_DIR, 'textures')
+SPRITE_DIR = os.path.join(RES_DIR, 'sprites')
+SOUND_DIR = os.path.join(RES_DIR, 'sound')
+MUSIC_DIR = os.path.join(RES_DIR, 'music')
+LEVEL_DIR = os.path.join(BASE_DIR, 'levels')
+SAVE_DIR = os.path.join(BASE_DIR, 'saves')
+CONFIG_PATH = os.path.join(BASE_DIR, 'config.json')
+
+# ---------------------------------------------------------------- display
+RES = WIDTH, HEIGHT = 1600, 900
+HALF_WIDTH = WIDTH // 2
+HALF_HEIGHT = HEIGHT // 2
+FPS = 60                      # frame cap (0 = uncapped)
+TITLE = 'KnotzDoom'
+
+# ---------------------------------------------------------------- player
+PLAYER_SPEED = 0.004          # world units per millisecond
+PLAYER_SPRINT_MULT = 1.45
+PLAYER_ROT_SPEED = 0.002
+PLAYER_RADIUS = 0.25          # collision radius in world units
+PLAYER_MAX_HEALTH = 100
+PLAYER_SUPER_HEALTH = 200
+PLAYER_MAX_ARMOR = 200
+
+MOUSE_SENSITIVITY = 0.0003
+MOUSE_MAX_REL = 40
+MOUSE_BORDER_LEFT = 100
+MOUSE_BORDER_RIGHT = WIDTH - MOUSE_BORDER_LEFT
+
+# ---------------------------------------------------------------- raycasting
+FOV = math.pi / 3
+HALF_FOV = FOV / 2
+NUM_RAYS = WIDTH // 2
+HALF_NUM_RAYS = NUM_RAYS // 2
+DELTA_ANGLE = FOV / NUM_RAYS
+MAX_DEPTH = 24
+
+SCREEN_DIST = HALF_WIDTH / math.tan(HALF_FOV)
+SCALE = WIDTH // NUM_RAYS
+MAX_PROJ_HEIGHT = HEIGHT * 12  # clamp so very close walls don't explode
+
+TEXTURE_SIZE = 256
+HALF_TEXTURE_SIZE = TEXTURE_SIZE // 2
+
+# ---------------------------------------------------------------- lighting
+SHADE_LEVELS = 10             # number of pre-darkened texture copies
+SHADE_MAX_DEPTH = 14.0        # depth at which walls reach the darkest level
+SHADE_MIN_BRIGHT = 0.12       # brightness of the darkest level (0..1)
+
+# ---------------------------------------------------------------- hud
+STATUS_BAR_HEIGHT = 96
+VIEW_HEIGHT = HEIGHT           # the 3d view is drawn full screen; the bar overlays it
+
+# ---------------------------------------------------------------- gameplay
+DOOR_OPEN_TIME = 450           # ms for a door to slide fully open
+DOOR_STAY_OPEN = 4000          # ms a door stays open before closing
+DOOR_PASSABLE = 0.7            # open fraction from which things can pass
+USE_DISTANCE = 1.2             # how far the "use" action reaches
+
+DIFFICULTIES = [
+    # name, description, enemy hp mult, enemy damage mult, ammo mult, enemy speed mult, skip every nth enemy
+    {'name': 'ROOKIE',    'desc': 'Half damage, double ammo.',        'hp': 0.8, 'dmg': 0.5,  'ammo': 2.0, 'speed': 0.9,  'skip': 3},
+    {'name': 'MARINE',    'desc': 'The way it is meant to be played.', 'hp': 1.0, 'dmg': 1.0,  'ammo': 1.0, 'speed': 1.0,  'skip': 0},
+    {'name': 'VETERAN',   'desc': 'Tougher demons, less ammo.',        'hp': 1.2, 'dmg': 1.25, 'ammo': 0.8, 'speed': 1.1,  'skip': 0},
+    {'name': 'NIGHTMARE', 'desc': 'Fast, brutal and unforgiving.',     'hp': 1.4, 'dmg': 1.6,  'ammo': 0.7, 'speed': 1.35, 'skip': 0},
+]
