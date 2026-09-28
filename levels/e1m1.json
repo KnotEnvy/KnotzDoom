@@ -1,0 +1,37 @@
+{
+  "id": "e1m1",
+  "name": "Hangar Bay",
+  "par_time": 90,
+  "sky": "sky",
+  "floor_color": [
+    34,
+    34,
+    38
+  ],
+  "default_wall": 1,
+  "music": "theme",
+  "player_angle": 0,
+  "story": "The shuttle docks against the hangar bay airlock with a shudder. The lights are out, the loading floor is slick with something dark, and the last of the dock crew are still standing, if you can call it that.\n\nFind the blast door controls and get inside the station.",
+  "grid": [
+    "##########################",
+    "#.........#......6.......#",
+    "#..h......#..|...D..z....#",
+    "#P..t.....D......6.......#",
+    "#.........#..|...6666D666#",
+    "#####D#####......#.......#",
+    "#.........#.z....#..h....#",
+    "#.u.......#......#...s...#",
+    "#.........######D#.......#",
+    "#....%....#......#..J....#",
+    "#..j......#..g...#########",
+    "####D######......#.......#",
+    "#.........#......D..z....#",
+    "#..e......#.%....#.......#",
+    "#.........########...b...#",
+    "#..z......#~~~~~~#...|...#",
+    "#.........#~~o~~~#.......#",
+    "#.........S~~~~~~B.......#",
+    "#....T....#~~~~~~#..T....#",
+    "#####################X####"
+  ]
+}

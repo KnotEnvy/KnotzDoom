@@ -1,0 +1,43 @@
+{
+  "title": "KNOTZDOOM",
+  "subtitle": "KNEE DEEP IN THE KNOTZ",
+  "copyright": "2026 KNOTENVY",
+  "levels": ["e1m1", "e1m2", "e1m3", "e1m4", "e1m5", "e1m6"],
+  "intro": "KNOTZ STATION, DEEP SPACE RELAY OUTPOST.\n\nThree hours ago the reactor techs opened a gateway they were told would give the station free energy forever. It gave them something else.\n\nThe last transmission from the hangar deck was screaming. Then static.\n\nYou are the only marine left on the supply shuttle. Your orders were to guard the cargo. Your orders are now to kill everything that came through that gateway, find the reactor core, and shut the gate for good.\n\nGrab your pistol. It is going to be a long night.",
+  "outro": "The cyberdemon collapses in a shower of sparks and gore. Behind it, the gateway flickers, screams, and folds in on itself.\n\nKnotz Station is silent again. Somewhere below, the reactor hums back to life.\n\nYou light a cigar with the still glowing barrel of your rocket launcher and start looking for the shuttle. You have a feeling this is not over.\n\nNot even close.",
+  "tips": [
+    "Doors close on their own. Keep moving.",
+    "Barrels explode. Stand well back, or use them.",
+    "Secrets are hidden behind walls that do not quite match. Press USE on anything suspicious.",
+    "Rockets hurt you too. Never fire one at point blank range."
+  ],
+  "credits": [
+    "# KNOTZDOOM",
+    "",
+    "A DOOM STYLE SHOOTER",
+    "BUILT WITH PYTHON AND PYGAME",
+    "",
+    "# CODE",
+    "KNOTENVY",
+    "CLAUDE",
+    "",
+    "# ENGINE",
+    "GRID RAYCASTER WITH SLIDING DOORS",
+    "DEPTH CLIPPED BILLBOARD SPRITES",
+    "FLOW FIELD MONSTER PATHFINDING",
+    "",
+    "# ART",
+    "CLASSIC DOOM INSPIRED SPRITES AND TEXTURES",
+    "PROCEDURAL PIXEL ART AND SOUND (tools/gen_assets.py)",
+    "",
+    "# MUSIC",
+    "ORIGINAL THEME AND PROCEDURAL LOOPS",
+    "",
+    "# SPECIAL THANKS",
+    "ID SOFTWARE, FOR 1993",
+    "THE PYGAME COMMUNITY",
+    "",
+    "",
+    "THANKS FOR PLAYING"
+  ]
+}

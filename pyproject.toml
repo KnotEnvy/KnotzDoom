@@ -1,0 +1,18 @@
+[project]
+name = "knotzdoom"
+version = "1.1.0"
+description = "A Doom style raycasting shooter built with pygame"
+requires-python = ">=3.10"
+dependencies = ["pygame>=2.5", "numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pyflakes>=3"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["perf: frame time budget tests (run with -m perf)"]
+addopts = "-p no:cacheprovider"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

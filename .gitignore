@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+saves/
+config.json
+records.json
+screenshots/smoke/
+screenshots/shot_*.png
+.venv/
+venv/
+*.egg-info/
