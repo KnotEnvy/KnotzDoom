@@ -153,6 +153,7 @@ tools/perf_test.py      per-phase frame time breakdown
 tools/level_map.py      top-down level previews
 tests/                  pytest suite: levels, raycasting, AI, saves, regressions, golden frames, flow
 findings.md             third-party performance and code review with status per finding
+handoff.json            machine-readable handoff for the next dev team: architecture, formats, recipes, backlog
 ```
 
 ## Making levels
