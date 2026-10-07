@@ -1,4 +1,4 @@
-"""Regression tests for the bugs found in the third-party review (findings.md)."""
+"""Regression tests for the bugs found in the third-party review (docs/findings.md)."""
 import pygame as pg
 
 from knotzdoom.npc import NPC

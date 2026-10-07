@@ -70,7 +70,7 @@
     "levels/e1m1..e1m6.json": "ASCII grid levels",
     "tools/": "gen_assets.py (procedural art/sound/music), optimize_assets.py, smoke_test.py, autoplay.py, timedemo.py, perf_test.py, level_map.py, screenshots.py",
     "tests/": "test_levels, test_raycasting, test_pathfinding, test_gameplay, test_regressions (one per review bug), test_rendering (golden + perf), test_view, test_assets, test_autoplay, test_game_flow",
-    "findings.md": "third-party performance/quality review with a status table of what was done"
+    "docs/findings.md": "third-party performance/quality review with a status table of what was done"
   },
   "data_formats": {
     "level_json": {
@@ -177,7 +177,7 @@
   "history": {
     "sessions": [
       "1: prototype rebuilt into a full game (engine package, six levels, generated assets, UI flow, tools, tests)",
-      "2: third-party review (findings.md) and optimisation pass: shared DDA raycaster, faster walls/sprites, detail levels, bug fixes, robustness, ui package split; 11.5 -> 6.0 ms per frame",
+      "2: third-party review (docs/findings.md) and optimisation pass: shared DDA raycaster, faster walls/sprites, detail levels, bug fixes, robustness, ui package split; 11.5 -> 6.0 ms per frame",
       "3: merge to master, repo cleanup, this handoff"
     ],
     "last_commit": "1d70c67"
