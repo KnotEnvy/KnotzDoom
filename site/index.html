@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KnotzDoom</title>
+<meta name="description" content="A complete Doom-style first person shooter written in Python with pygame: six levels, four weapons, five monster types.">
+<meta property="og:title" content="KnotzDoom">
+<meta property="og:description" content="A complete Doom-style first person shooter written in Python with pygame.">
+<meta property="og:image" content="screenshots/play.png">
+<style>
+:root{--bg:#120a0a;--panel:#1d1111;--fg:#e8dcd2;--muted:#a8978c;--accent:#d8321e;--accent2:#ff8a3d;--line:#3a2220}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent2)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 16px}
+header{padding:48px 0 24px;text-align:center}
+h1{font:900 clamp(2.5rem,9vw,4.5rem)/1 Impact,"Arial Black",sans-serif;letter-spacing:.04em;margin:0;color:var(--accent);text-shadow:0 3px 0 #000,0 0 28px rgba(216,50,30,.45)}
+.tag{color:var(--muted);max-width:640px;margin:16px auto 24px}
+.btn{display:inline-block;margin:4px;padding:10px 22px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;text-decoration:none;font-weight:600}
+.btn.alt{background:transparent;color:var(--fg)}
+.hero{width:100%;height:auto;border:2px solid var(--line);border-radius:6px;display:block}
+h2{font-size:1.5rem;margin:48px 0 12px;color:var(--accent2);border-bottom:1px solid var(--line);padding-bottom:6px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+figure{margin:0}
+figure img{width:100%;height:auto;border:1px solid var(--line);border-radius:4px;display:block;background:#000}
+figcaption{font-size:.85rem;color:var(--muted);margin-top:4px}
+ul.feat{padding-left:20px}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 16px;overflow-x:auto}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+table{border-collapse:collapse;width:100%;background:var(--panel)}
+th,td{text-align:left;padding:6px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+.scroll{overflow-x:auto}
+footer{margin:56px 0 32px;text-align:center;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <h1>KnotzDoom</h1>
+  <p class="tag">A complete Doom-style first person shooter written in Python with pygame: a grid raycaster with sliding doors, six hand-built levels, four weapons and five monster types.</p>
+  <a class="btn" href="#run">Run it</a>
+  <a class="btn alt" href="https://github.com/KnotEnvy/KnotzDoom">Source on GitHub</a>
+</header>
+
+<main class="wrap">
+  <img class="hero" src="screenshots/play.png" alt="KnotzDoom gameplay: a corridor with a monster and the status bar" width="1600" height="900">
+
+  <h2>Features</h2>
+  <ul class="feat">
+    <li><strong>Six levels</strong> from the Hangar Bay to the Cyber Throne, with story text, par times and a boss fight.</li>
+    <li><strong>Four weapons</strong>: pistol, shotgun, chaingun and a rocket launcher whose splash hurts you too.</li>
+    <li><strong>Five monsters</strong> that see you, hear gunfire, open doors and path around each other.</li>
+    <li><strong>Doors, keycards, secrets</strong>, exploding barrels, soulspheres, armor and an automap.</li>
+    <li><strong>Full game flow</strong>: title screen, four skill levels, options, intermission tallies, four save slots, classic cheats.</li>
+    <li><strong>Pure Python engine</strong> with auto detail scaling; about 6 ms per frame in the timedemo.</li>
+  </ul>
+
+  <h2>Screenshots</h2>
+  <div class="grid">
+    <figure><img src="screenshots/title.png" alt="Title screen" loading="lazy"><figcaption>Title screen with a live 3D backdrop</figcaption></figure>
+    <figure><img src="screenshots/menu.png" alt="Main menu" loading="lazy"><figcaption>Main menu</figcaption></figure>
+    <figure><img src="screenshots/automap.png" alt="Automap overlay" loading="lazy"><figcaption>Automap overlay</figcaption></figure>
+    <figure><img src="screenshots/intermission.png" alt="Intermission tally" loading="lazy"><figcaption>Intermission tally</figcaption></figure>
+  </div>
+
+  <h2>The episode</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>#</th><th>Level</th><th>Theme</th><th>Par</th></tr>
+    <tr><td>1</td><td>Hangar Bay</td><td>Gray brick loading docks, first doors, keys and a hidden soulsphere</td><td>1:30</td></tr>
+    <tr><td>2</td><td>Waste Tunnels</td><td>Mossy sewers, barrels, a cacodemon guarding the blue key</td><td>2:30</td></tr>
+    <tr><td>3</td><td>Command Center</td><td>Night-time tech base, chaingun, red then blue key hunt</td><td>3:20</td></tr>
+    <tr><td>4</td><td>The Furnace</td><td>Hell-brick reactor ring, rocket launcher, first hell knights</td><td>4:00</td></tr>
+    <tr><td>5</td><td>Blood Cathedral</td><td>Banner-lined nave, three wings, three keys</td><td>5:00</td></tr>
+    <tr><td>6</td><td>Cyber Throne</td><td>Guarded approach and a pillar arena against the cyberdemon</td><td>4:00</td></tr>
+  </table>
+  </div>
+
+  <h2>Level maps</h2>
+  <div class="grid">
+    <figure><img src="screenshots/maps/e1m1.png" alt="Map of Hangar Bay" loading="lazy"><figcaption>E1M1 Hangar Bay</figcaption></figure>
+    <figure><img src="screenshots/maps/e1m2.png" alt="Map of Waste Tunnels" loading="lazy"><figcaption>E1M2 Waste Tunnels</figcaption></figure>
+    <figure><img src="screenshots/maps/e1m3.png" alt="Map of Command Center" loading="lazy"><figcaption>E1M3 Command Center</figcaption></figure>
+    <figure><img src="screenshots/maps/e1m4.png" alt="Map of The Furnace" loading="lazy"><figcaption>E1M4 The Furnace</figcaption></figure>
+    <figure><img src="screenshots/maps/e1m5.png" alt="Map of Blood Cathedral" loading="lazy"><figcaption>E1M5 Blood Cathedral</figcaption></figure>
+    <figure><img src="screenshots/maps/e1m6.png" alt="Map of Cyber Throne" loading="lazy"><figcaption>E1M6 Cyber Throne</figcaption></figure>
+  </div>
+
+  <h2 id="run">Run it</h2>
+  <p>KnotzDoom is a desktop game. It needs Python 3.10+.</p>
+<pre><code>git clone https://github.com/KnotEnvy/KnotzDoom.git
+cd KnotzDoom
+pip install -r requirements.txt
+python main.py</code></pre>
+
+  <h2>Controls</h2>
+  <div class="scroll">
+  <table>
+    <tr><th>Key</th><th>Action</th></tr>
+    <tr><td>W A S D / arrows</td><td>Move, strafe and turn</td></tr>
+    <tr><td>Mouse / left button</td><td>Look around / fire</td></tr>
+    <tr><td>Shift</td><td>Sprint</td></tr>
+    <tr><td>E / Space</td><td>Use doors, switches and secret walls</td></tr>
+    <tr><td>1 - 4 / mouse wheel</td><td>Select weapon</td></tr>
+    <tr><td>Tab</td><td>Automap</td></tr>
+    <tr><td>F5 / F9</td><td>Quick save / quick load</td></tr>
+    <tr><td>F11 / F12</td><td>Fullscreen / screenshot</td></tr>
+    <tr><td>Esc</td><td>Pause menu</td></tr>
+  </table>
+  </div>
+</main>
+
+<footer class="wrap">
+  <a href="https://github.com/KnotEnvy/KnotzDoom">github.com/KnotEnvy/KnotzDoom</a>
+</footer>
+</body>
+</html>

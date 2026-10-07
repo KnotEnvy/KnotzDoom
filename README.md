@@ -8,6 +8,8 @@ everything in between.
 
 ![KnotzDoom](screenshots/play.png)
 
+Project page: https://knotenvy.github.io/KnotzDoom/
+
 | Title | Intermission | Automap |
 | --- | --- | --- |
 | ![title](screenshots/title.png) | ![intermission](screenshots/intermission.png) | ![automap](screenshots/automap.png) |
@@ -73,7 +75,7 @@ ammo, keys and armor), `idclip` (walk through walls) and `iddt` (reveal the map)
 ## Performance
 
 The engine is pure Python on pygame surfaces, so every per-column and
-per-sprite operation counts. After the optimisation pass (see `findings.md`
+per-sprite operation counts. After the optimisation pass (see `docs/findings.md`
 for the third-party review that drove it):
 
 | Measurement (reference machine, headless) | Before | After |
@@ -152,8 +154,8 @@ tools/timedemo.py       frame time replay of the bot's route (mean, median, p95,
 tools/perf_test.py      per-phase frame time breakdown
 tools/level_map.py      top-down level previews
 tests/                  pytest suite: levels, raycasting, AI, saves, regressions, golden frames, flow
-findings.md             third-party performance and code review with status per finding
-handoff.json            machine-readable handoff for the next dev team: architecture, formats, recipes, backlog
+docs/findings.md        third-party performance and code review with status per finding
+docs/handoff.json       machine-readable handoff for the next dev team: architecture, formats, recipes, backlog
 ```
 
 ## Making levels
@@ -186,4 +188,14 @@ pixel-art style:
 
 ```bash
 python tools/gen_assets.py --contact-sheet /tmp/assets.png
+```
+
+## Project page
+
+`site/index.html` is the GitHub Pages landing page. The `Deploy Pages` workflow
+copies it together with `screenshots/` and publishes on every push to `master`
+that touches those paths. To preview locally:
+
+```bash
+mkdir -p /tmp/site && cp -r site/. /tmp/site/ && cp -r screenshots /tmp/site/ && python -m http.server -d /tmp/site
 ```

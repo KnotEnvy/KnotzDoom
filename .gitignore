@@ -9,3 +9,7 @@ screenshots/shot_*.png
 .venv/
 venv/
 *.egg-info/
+.DS_Store
+.idea/
+.vscode/
+_site/
